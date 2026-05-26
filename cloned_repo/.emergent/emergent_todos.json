@@ -1,0 +1,46 @@
+[
+  {
+    "content": "Fix economic outflow imbalance",
+    "status": "completed"
+  },
+  {
+    "content": "Group cinemas by region+size",
+    "status": "completed"
+  },
+  {
+    "content": "Unify Cinema Manager + Calendar tab",
+    "status": "completed"
+  },
+  {
+    "content": "Add TV Network Manager tab",
+    "status": "completed"
+  },
+  {
+    "content": "Group rival TV channels by sister-network prefix",
+    "status": "completed"
+  },
+  {
+    "content": "Add Browse Talent Pool + Negotiate to Series Creator",
+    "status": "completed"
+  },
+  {
+    "content": "Fix nested TouchableOpacity on streaming catalog rows (tier-edit no-op)",
+    "status": "completed"
+  },
+  {
+    "content": "Add global exclusivity-lock checker; enforce on streaming/TV/bulk licenses; clear UI lock indicators",
+    "status": "completed"
+  },
+  {
+    "content": "Fix Marketing tab navigation (was redirecting to current-movies)",
+    "status": "completed"
+  },
+  {
+    "content": "Run testing agent + manual coherence sweep",
+    "status": "in_progress"
+  },
+  {
+    "content": "Commit & push to V44 branch",
+    "status": "pending"
+  }
+]

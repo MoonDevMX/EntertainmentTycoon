@@ -1,0 +1,6 @@
+{
+  "name": "Mass Entertainment Tycoon",
+  "description": "Run your own media empire! From blockbuster films, franchises, and premium cinemas to custom gaming systems, next-gen hardware consoles, and subscription Game Pass aggregators in this ultimate entertainment fusion tycoon.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

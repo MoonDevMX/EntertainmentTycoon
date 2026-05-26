@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "alwaysStrict": false,
+    "noImplicitThis": false,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "expo-router": ["./src/mocks/expo-router.tsx"],
+      "@expo/vector-icons": ["./src/mocks/vector-icons.tsx"],
+      "@react-native-async-storage/async-storage": ["./src/mocks/async-storage.ts"],
+      "react-native-safe-area-context": ["./src/mocks/safe-area-context.tsx"],
+      "@react-native-community/slider": ["./src/mocks/slider.tsx"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "app/**/*"],
+  "exclude": ["cloned_repo", "frontend", "backend", "tests", "node_modules", "dist"]
+}
