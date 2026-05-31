@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { T } from '../../src/ui/theme';
 import { TopBar, SectionHeader } from '../../src/ui/components';
 import { defaultTiers, genServiceName, TIER_PERIOD_LABEL, effectiveMonthlyPrice } from '../../src/game/data';
 import { SubscriptionTier, TierPeriod } from '../../src/game/types';
+import { uiAlert } from '../../src/ui/ui-alert';
 
 const PERIOD_OPTS: { key: TierPeriod; label: string }[] = [
   { key: 'monthly', label: 'Monthly' },
@@ -16,11 +17,6 @@ const PERIOD_OPTS: { key: TierPeriod; label: string }[] = [
   { key: 'yearly', label: 'Yearly' },
 ];
 
-function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
-}
-
 export default function StreamingLaunch() {
   const router = useRouter();
   const { state, launchStreamingService } = useGame();
@@ -28,6 +24,24 @@ export default function StreamingLaunch() {
   const [tiers, setTiers] = useState<SubscriptionTier[]>(defaultTiers());
 
   if (!state) return null;
+
+  if (state.year < 1997) {
+    return (
+      <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+        <TopBar title="Technical Lock" onBack={() => router.back()} onHome={() => router.replace('/dashboard')} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <MaterialCommunityIcons name="clock-outline" size={80} color={T.red} />
+          <Text style={{ color: T.red, fontSize: 22, fontWeight: '900', marginTop: 16 }}>ERA NOT UNLOCKED</Text>
+          <Text style={{ fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 20, color: T.textDim }}>
+            Streaming-on-demand services cannot be founded in <Text style={{ color: T.yellow, fontWeight: '700' }}>Year {state.year}</Text>. You must wait until corporate high-speed digital internet infrastructures become standard in <Text style={{ color: T.cyan, fontWeight: '700' }}>Year 1997</Text>.
+          </Text>
+          <TouchableOpacity style={[s.launchBtn, { backgroundColor: T.cyan, marginTop: 24, width: '100%' }]} onPress={() => router.back()}>
+            <Text style={{ color: T.cardDark, fontWeight: '900' }}>Return to Studio</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const cash = state.player.cash;
   const cost = 0.2;
@@ -38,7 +52,7 @@ export default function StreamingLaunch() {
   const removeTier = (idx: number) => setTiers(t => t.filter((_, i) => i !== idx));
   const addTier = () => {
     if (tiers.length >= 4) {
-      notify('Maximum tiers reached', 'You can have up to 4 tiers per service.');
+      uiAlert('Maximum tiers reached', 'You can have up to 4 tiers per service.');
       return;
     }
     setTiers(t => [...t, {
@@ -48,11 +62,11 @@ export default function StreamingLaunch() {
   };
 
   const onLaunch = () => {
-    if (!name.trim()) { notify('Name required', 'Give your streaming service a name.'); return; }
-    if (tiers.length === 0) { notify('Tiers required', 'Add at least one subscription tier.'); return; }
-    if (cash < cost) { notify('Not enough cash', `Launch costs $${(cost * 1000).toFixed(0)}M. You have $${(cash * 1000).toFixed(0)}M.`); return; }
+    if (!name.trim()) { uiAlert('Name required', 'Give your streaming service a name.'); return; }
+    if (tiers.length === 0) { uiAlert('Tiers required', 'Add at least one subscription tier.'); return; }
+    if (cash < cost) { uiAlert('Not enough cash', `Launch costs $${(cost * 1000).toFixed(0)}M. You have $${(cash * 1000).toFixed(0)}M.`); return; }
     const r = launchStreamingService({ name: name.trim(), tiers });
-    if (r.error) { notify('Cannot launch', r.error); return; }
+    if (r.error) { uiAlert('Cannot launch', r.error); return; }
     router.replace('/streaming');
   };
 

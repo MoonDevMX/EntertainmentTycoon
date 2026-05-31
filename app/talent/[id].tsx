@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Platform, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -8,10 +8,10 @@ import { T } from '../../src/ui/theme';
 import { TopBar, Avatar, NeonStat, SectionHeader } from '../../src/ui/components';
 import { COLOR_HEX, GENRES } from '../../src/game/data';
 import { calculateTalentExpectations, calculateAcceptance, talentAvailability } from '../../src/game/sim';
+import { uiAlert } from '../../src/ui/ui-alert';
 
 function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
+  uiAlert(title, msg);
 }
 
 function prettyRole(r: string) {

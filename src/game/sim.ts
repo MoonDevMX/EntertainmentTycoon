@@ -281,8 +281,10 @@ export function newGame(playerName: string, logoIdx: number): GameState {
   const allStudioIds = [player.id, ...rivals.map(r => r.id)];
   const relationships = buildInitialRelationships(allStudioIds);
 
-  // Seed 4 rivals with active streaming services so the player has competitors on Day 1.
-  const seededRivalIdxs = [0, 3, 6, 9].map(i => i % rivals.length);
+  const START_YEAR = 1951; // Game starts at year 1951 → 50 years of industry history seeded before Day 1
+
+  // Seed 4 rivals with active streaming services so the player has competitors on Day 1 (only if START_YEAR is 1997 or above)
+  const seededRivalIdxs = START_YEAR >= 1997 ? [0, 3, 6, 9].map(i => i % rivals.length) : [];
   const streamingServices: StreamingService[] = seededRivalIdxs.map(i => {
     const r = rivals[i];
     const tiers = defaultTiers().map(t => ({ ...t, price: +(t.price * (0.85 + Math.random() * 0.4)).toFixed(2) }));
@@ -304,19 +306,71 @@ export function newGame(playerName: string, logoIdx: number): GameState {
       history: [],
     };
   });
-
-  const START_YEAR = 51; // Game starts at year 51 → 50 years of industry history seeded before Day 1
   const ipSeed = seedExternalLicensors();
   const seeded = seedHistory({
     initialized: true, week: 1, year: START_YEAR, player, rivals,
     movies: [], talents, franchises, audience, relationships, streamingServices,
-    newsLog: [{ week: 1, year: START_YEAR, text: `${player.name} opens its doors. The industry has 50 years of history, ${streamingServices.length} streaming services online.` }],
+    newsLog: [{ week: 1, year: START_YEAR, text: `${player.name} opens its doors. The industry has 50 years of history. Redefined chronology set to year 1951!` }],
     externalLicensors: ipSeed.licensors,
     externalIPs: ipSeed.ips,
     externalIPOffers: [],
     ownedIPLicenses: [],
     outboundIPListings: [],
     outboundIPBids: [],
+    videoStores: [
+      {
+        id: 'vstore_p1',
+        name: `${player.name} Sunset Strip Video Club`,
+        size: 'boutique',
+        region: 'US',
+        establishedYear: START_YEAR,
+        establishedWeek: 1,
+        status: 'active',
+        pricingTier: 'balanced',
+        customerBaseM: 0.15,
+        weeklyOpexB: 0.00015,
+        weeklyRevenueB: 0.00045,
+        rentCostUSD: 2.99,
+        buyCostUSD: 14.99,
+        vhsStockIds: [],
+        dvdStockIds: []
+      },
+      {
+        id: 'vstore_r1',
+        name: 'Blockbuster Classic NY',
+        size: 'megastore',
+        region: 'US',
+        establishedYear: START_YEAR,
+        establishedWeek: 1,
+        status: 'active',
+        pricingTier: 'balanced',
+        customerBaseM: 0.85,
+        weeklyOpexB: 0.00045,
+        weeklyRevenueB: 0.00165,
+        rentCostUSD: 3.50,
+        buyCostUSD: 19.99,
+        vhsStockIds: [],
+        dvdStockIds: []
+      },
+      {
+        id: 'vstore_r2',
+        name: 'Tokyo Retro Cinema Corner',
+        size: 'kiosk',
+        region: 'Asia',
+        establishedYear: START_YEAR,
+        establishedWeek: 1,
+        status: 'active',
+        pricingTier: 'budget',
+        customerBaseM: 0.05,
+        weeklyOpexB: 0.00004,
+        weeklyRevenueB: 0.00012,
+        rentCostUSD: 1.50,
+        buyCostUSD: 9.99,
+        vhsStockIds: [],
+        dvdStockIds: []
+      }
+    ],
+    videoClubDeals: [],
   });
   // Seed 1 starter inbound IP offer so the player sees the External IP feature on day 1.
   // V42b — Also seed TV channels + cable providers immediately so screens have data on Day 1.
@@ -694,6 +748,9 @@ export interface LaunchStreamingArgs { name: string; tiers: import('./types').Su
 export const MAX_PLAYER_STREAMING_SERVICES = 3;
 
 export function launchPlayerStreamingService(state: GameState, args: LaunchStreamingArgs): { state: GameState; service?: StreamingService; error?: string } {
+  if (state.year < 1997) {
+    return { state, error: `Streaming services cannot be launched before Year 1997 (era of corporate high-speed internet & video-on-demand). Build your studio reputation and physical VHS/DVD Rental Video Clubs first!` };
+  }
   const playerServices = (state.streamingServices || []).filter(s => s.studioId === state.player.id);
   if (playerServices.length >= MAX_PLAYER_STREAMING_SERVICES) {
     return { state, error: `You can only operate up to ${MAX_PLAYER_STREAMING_SERVICES} streaming services.` };
@@ -5240,7 +5297,9 @@ export function deletePlayerCableNetwork(state: GameState, networkId: string): {
   const list = state.playerCableNetworks || [];
   const idx = list.findIndex(n => n.id === networkId);
   if (idx < 0) return { state, error: 'Not found.' };
-  const refundB = +(list[idx].subscribers * 0.05).toFixed(2);
+  const net = list[idx];
+  const totalSubs = (net as any).subscribers || net.tiers?.reduce((s: number, t: any) => s + (t.subscribers || 0), 0) || 0;
+  const refundB = +(totalSubs * 0.05).toFixed(2);
   const player = { ...state.player, cash: +(state.player.cash + refundB).toFixed(3) };
   return { state: { ...state, player, playerCableNetworks: list.filter(n => n.id !== networkId) } };
 }
@@ -5949,7 +6008,7 @@ export function tickAIStreamingLifecycle(state: GameState): GameState {
     const myServices = services.filter(sv => sv.studioId === r.id);
     const myReleased = movies.filter(m => m.studioId === r.id && m.status === 'released');
     // LAUNCH: rival has 3+ released films and no service yet (V38 — loosened from 6+ for more visible activity)
-    if (myServices.length === 0 && myReleased.length >= 3 && r.cash >= 0.25 && Math.random() < 0.025) {
+    if (s.year >= 1997 && myServices.length === 0 && myReleased.length >= 3 && r.cash >= 0.25 && Math.random() < 0.025) {
       const baseTiers: any[] = [
         { id: uid('t_'), name: 'Basic', period: 'monthly', price: 7.99, screens: 1, users: 1, isExclusive: false },
         { id: uid('t_'), name: 'Standard', period: 'monthly', price: 12.99, screens: 2, users: 4, isExclusive: false },

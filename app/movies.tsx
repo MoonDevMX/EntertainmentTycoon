@@ -156,7 +156,7 @@ export default function Movies() {
               <TouchableOpacity style={s.row} onPress={() => router.push(`/movie/${item.id}`)} testID={`movie-${item.id}`}>
                 <IconTile icon={item.iconKey} color={item.iconBg} size={64} />
                 <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={s.title} numberOfLines={1}>{item.title}</Text>
+                  <Text style={s.title} numberOfLines={2}>{item.title}</Text>
                   <Text style={s.sub} numberOfLines={1}>
                     {studio ? studio.name : 'Unknown Studio'} · {item.brand} · {item.genre}
                   </Text>

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useState, useMemo } from 'react';
@@ -8,12 +8,12 @@ import { T } from '../src/ui/theme';
 import { TopBar, IconTile } from '../src/ui/components';
 import { monthOf, holidayFor, WEEKS_PER_YEAR } from '../src/game/data';
 import { Movie } from '../src/game/types';
+import { uiAlert } from '../src/ui/ui-alert';
 
 type Tab = 'now' | 'soon' | 'hold';
 
 function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
+  uiAlert(title, msg);
 }
 
 export default function CurrentMovies() {
@@ -77,7 +77,7 @@ export default function CurrentMovies() {
         <TouchableOpacity style={s.rowMain} onPress={() => router.push(`/movie/${item.id}`)} testID={`current-movie-${item.id}`}>
           <IconTile icon={item.iconKey} color={item.iconBg} size={56} />
           <View style={{ flex: 1, paddingHorizontal: 10 }}>
-            <Text style={s.title} numberOfLines={1}>{item.title}</Text>
+            <Text style={s.title} numberOfLines={2}>{item.title}</Text>
             <Text style={s.sub}>{studio?.name || 'Unknown'} · {item.brand} · {item.genre}</Text>
             {tab === 'now' && (
               <Text style={[s.tag, { color: T.green }]} numberOfLines={1}>

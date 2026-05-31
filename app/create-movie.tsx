@@ -117,6 +117,14 @@ export default function CreateMovie() {
   useEffect(() => {
     if (paramsLoaded) return;
     
+    // If the draft is already active and we don't have explicit reset/brand params,
+    // do not re-initialize (we are returning from talent selection)
+    const isReset = params.reset === '1' || !!params.brand || !!params.franchiseId || !draft.active;
+    if (!isReset) {
+      setParamsLoaded(true);
+      return;
+    }
+    
     // Consume the params just once
     const pBrand = params.brand || '';
     const bOption = pBrand.toUpperCase() === 'ORIGINAL' ? 'Original' :
@@ -133,7 +141,7 @@ export default function CreateMovie() {
       projectType: rawPath && rawPath.includes('create-series') ? 'series' : 'movie',
     });
     setParamsLoaded(true);
-  }, [params, rawPath, paramsLoaded]);
+  }, [params, rawPath, paramsLoaded, draft.active, initFromParams]);
 
   const updateCastSlot = (idx: number, fields: Partial<(typeof draft.cast)[0]>) => {
     const nextCast = [...draft.cast];
@@ -993,21 +1001,36 @@ export default function CreateMovie() {
               <View style={s.streamingPanel}>
                 <Text style={s.sumLabel}>TV Network Broadcast Target</Text>
                 <Text style={s.streamingHint}>Select which TV network airs the premiere broadcast of your film.</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginVertical: 6 }}>
-                  {(state.tvNetworks || []).map(net => {
-                    const isNetSel = draft.tvNetworkId === net.id;
+                {(() => {
+                  const filteredNets = (state.tvNetworks || []).filter(net => 
+                    net.ownerStudioId === state.player.id || 
+                    (state.tvNetworkDeals || []).some(d => d.networkId === net.id && d.status === 'active')
+                  );
+                  if (filteredNets.length === 0) {
                     return (
-                      <TouchableOpacity key={net.id}
-                        onPress={() => setDraft({ tvNetworkId: net.id })}
-                        style={[s.chip, isNetSel && { backgroundColor: T.cyan, borderColor: T.cyan }]}
-                        testID={`movie-tv-picker-${net.id}`}
-                      >
-                        <Text style={[s.chipT, isNetSel && { color: T.cardDark }]}>{net.name} ({net.kind.toUpperCase()})</Text>
-                        <Text style={{ color: isNetSel ? T.cardDark : T.textMute, fontSize: 10, marginTop: 2 }}>{net.subscribers}M Subs · Payout rate x1.0</Text>
-                      </TouchableOpacity>
+                      <Text style={{ color: T.orange, fontSize: 11, fontStyle: 'italic', paddingVertical: 10 }}>
+                        ⚠️ No eligible TV networks found. You must own a channel or sign an active TV carriage deal first. Go to TV Networks to configure!
+                      </Text>
                     );
-                  })}
-                </ScrollView>
+                  }
+                  return (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginVertical: 6 }}>
+                      {filteredNets.map(net => {
+                        const isNetSel = draft.tvNetworkId === net.id;
+                        return (
+                          <TouchableOpacity key={net.id}
+                            onPress={() => setDraft({ tvNetworkId: net.id })}
+                            style={[s.chip, isNetSel && { backgroundColor: T.cyan, borderColor: T.cyan }]}
+                            testID={`movie-tv-picker-${net.id}`}
+                          >
+                            <Text style={[s.chipT, isNetSel && { color: T.cardDark }]}>{net.name} ({net.kind.toUpperCase()})</Text>
+                            <Text style={{ color: isNetSel ? T.cardDark : T.textMute, fontSize: 10, marginTop: 2 }}>{net.subscribers}M Subs · Payout rate x1.0</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  );
+                })()}
               </View>
             ) : null}
 

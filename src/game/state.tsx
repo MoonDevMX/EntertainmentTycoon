@@ -5,7 +5,7 @@ import { newGame, simulateWeek as simWeek, simulateMultiple as simMulti, tickWee
 import type { CinemaRegion, OwnedCinemaSize } from './types';
 import { FranchiseOfferKind, GameEngineModule, GamingStudioType } from './types';
 import { GENRES } from './data';
-import { seedGamingFields, createEngineAction, foundStudioAction, startProjectAction, designConsoleAction, buildHQRoomAction, recruitGamingStaffAction, configurePassAction, createMovieFromGameAction, renameGamingStudioHQAction, deleteGamingStudioHQAction, renameGameEngineAction, deleteGameEngineAction, renameGamingConsoleAction, deleteGamingConsoleAction, researchNextGenAction } from './gaming';
+import { seedGamingFields, createEngineAction, foundStudioAction, startProjectAction, designConsoleAction, buildHQRoomAction, recruitGamingStaffAction, configurePassAction, createMovieFromGameAction, renameGamingStudioHQAction, deleteGamingStudioHQAction, renameGameEngineAction, deleteGameEngineAction, renameGamingConsoleAction, deleteGamingConsoleAction, researchNextGenAction, toggleStudioHQPerkAction, setStudioHQPolicyAction, proposeGamingDealAction, processGamingDealResponseAction, createORUpdateGamingPassTierAction, deleteGamingPassTierAction, bundlePassWithStreamingAction, buildVideoStoreAction, configureVideoStorePricingAction, toggleVideoStoreStatusAction, stockMovieInVideoStoreAction, proposeVideoClubDealAction, discontinueGamingPassServiceAction, bulkBuildVideoStoresAction, bulkConfigureVideoStorePricingAction, bulkStockMoviesInVideoStoresAction, createGamingPassAction, renameGamingPassAction, seedGamingPassTiersAction } from './gaming';
 
 const STORAGE_KEY = 'mooncinema_save_v8';
 const LEGACY_KEYS = ['mooncinema_save_v7', 'mooncinema_save_v6', 'mooncinema_save_v5'];
@@ -43,9 +43,42 @@ function ensureGranularSkills(t: any): any {
   return { ...t, skills: t.skills || breakdown, genreSkills: t.genreSkills || gs };
 }
 
+// Recursively migrates any legacy years (e.g. 51 or 1) to actual calendar years (e.g. 1951)
+function migrateYearsInPlace(obj: any): void {
+  if (!obj || typeof obj !== 'object') return;
+
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'number') {
+      if (key === 'year' || key.endsWith('Year')) {
+        if (val > 0 && val < 1000) {
+          obj[key] = val + 1900;
+        }
+      }
+    } else if (typeof val === 'object') {
+      if (key === 'genreYearlyBO' || key === 'audienceYearlySnapshot') {
+        const newRecord: any = {};
+        for (const recordKey of Object.keys(val)) {
+          const yrNum = parseInt(recordKey, 10);
+          const migratedKey = (!isNaN(yrNum) && yrNum > 0 && yrNum < 1000) ? String(yrNum + 1900) : recordKey;
+          newRecord[migratedKey] = val[recordKey];
+          migrateYearsInPlace(newRecord[migratedKey]);
+        }
+        obj[key] = newRecord;
+      } else {
+        migrateYearsInPlace(val);
+      }
+    }
+  }
+}
+
 // Migrate older saves: rename gold→yellow, add gender/relationships/streamingServices if missing.
 function migrate(raw: any): GameState {
   const s = raw as GameState;
+  
+  // Recursively convert year offsets to calendar years starting at 1951
+  migrateYearsInPlace(s);
+
   // Talents: gold→yellow + gender backfill + granular skills backfill + role collapse (legacy lead_/support_ → actor/actress)
   if (Array.isArray(s.talents)) {
     s.talents = s.talents.map((t: any) => {
@@ -238,7 +271,9 @@ type Ctx = {
   designConsole: (args: { title: string; specs: any; price: number; manufacturingCost: number }) => { error?: string };
   buildHQRoom: (studioHQId: string, roomKey: string) => { error?: string };
   recruitGamingStaff: (studioHQId: string, role: string, qtyToAdd: number) => { error?: string };
-  configurePass: (price: number, name: string, basicPrice?: number, premiumPrice?: number, adSupported?: boolean, enabledConsoleIds?: string[], catalogProjectIds?: string[]) => { error?: string };
+  configurePass: (priceOrLevel: any, nameOrScope?: any, basicPriceOrAdWave?: any, premiumPriceFallback?: number, adSupportedFallback?: boolean, enabledConsoleIds?: string[], catalogProjectIds?: string[]) => { error?: string };
+  toggleStudioHQPerk: (studioHQId: string, perkKey: 'freeSnacks' | 'ergoChairs' | 'gym', install: boolean) => { error?: string };
+  setStudioHQPolicy: (studioHQId: string, welfareLevel: 'basic' | 'standard' | 'luxurious', crunchPolicy: 'none' | 'balanced' | 'crunch') => { error?: string };
   createMovieFromGame: (gameProjectId: string, movieTitle: string, userPlot: string, type: any) => { error?: string };
   renameGamingStudioHQ: (studioHQId: string, newName: string) => { error?: string };
   deleteGamingStudioHQ: (studioHQId: string) => { error?: string };
@@ -247,6 +282,26 @@ type Ctx = {
   renameGamingConsole: (consoleId: string, newTitle: string) => { error?: string };
   deleteGamingConsole: (consoleId: string) => { error?: string };
   researchNextGen: () => { error?: string };
+  // V44 advanced actions
+  proposeGamingDeal: (args: { dealType: 'publishing_inbound' | 'publishing_outbound' | 'crossover_license' | 'franchise_trade' | 'gamepass_bulk_catalog'; proposerStudioId: string; receiverStudioId: string; gameId?: string; franchiseId?: string; years?: number; upfrontFeeB: number; royaltyPercent?: number; exclusiveConsoleId?: string; termsText: string }) => { error?: string; deal?: any };
+  processGamingDealResponse: (args: { dealId: string; response: 'accepted' | 'rejected' | 'countered'; counterFeeB?: number }) => { error?: string };
+  createORUpdateGamingPassTier: (args: { passId: string; tierId?: string; name: string; price: number; adSupported: boolean; perks: string[] }) => { error?: string };
+  deleteGamingPassTier: (args: { passId: string; tierId: string }) => { error?: string };
+  discontinueGamingPassService: (args: { passId: string }) => { error?: string };
+  bundlePassWithStreaming: (args: { passId: string; streamingServiceId: string | null; discountPercent: number }) => { error?: string };
+  createGamingPass: (args: { name: string }) => { error?: string };
+  renameGamingPass: (args: { passId: string; name: string }) => { error?: string };
+  seedGamingPassTiers: (passId: string) => { error?: string };
+  buildVideoStore: (args: { name: string; size: 'kiosk' | 'boutique' | 'megastore'; region: 'US' | 'Europe' | 'Asia' | 'LatAm' }) => { error?: string };
+  bulkBuildVideoStores: (args: { buildPlan: Record<string, number> }) => { error?: string };
+  configureVideoStorePricing: (args: { storeId: string; pricingTier: 'budget' | 'balanced' | 'premium'; rentCost: number; buyCost: number; exclusiveGatedTiers?: string[] }) => { error?: string };
+  bulkConfigureVideoStorePricing: (args: { pricingTier: 'budget' | 'balanced' | 'premium'; rentCost: number; buyCost: number; regions?: ('US' | 'Europe' | 'Asia' | 'LatAm')[]; sizes?: ('kiosk' | 'boutique' | 'megastore')[] }) => { error?: string };
+  toggleVideoStoreStatus: (storeId: string) => { error?: string };
+  stockMovieInVideoStore: (args: { storeId: string; movieId: string; format: 'vhs' | 'dvd' }) => { error?: string };
+  bulkStockMoviesInVideoStores: (args: { movieIds: string[]; format: 'vhs' | 'dvd'; regions?: ('US' | 'Europe' | 'Asia' | 'LatAm')[]; sizes?: ('kiosk' | 'boutique' | 'megastore')[] }) => { error?: string };
+  proposeVideoClubDeal: (args: { dealType: 'inbound_vhs' | 'outbound_vhs' | 'inbound_dvd' | 'outbound_dvd'; receiverId: string; movieId?: string; upfrontFeeB: number; royaltyPercent: number; years: number }) => { error?: string };
+  toggleGamingProjectHold: (gameProjectId: string) => { error?: string };
+  cancelGamingProject: (gameProjectId: string) => { error?: string };
 };
 
 const GameCtx = createContext<Ctx | null>(null);
@@ -284,11 +339,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (raw) {
-          let loaded = migrate(JSON.parse(raw));
+          const parsed = JSON.parse(raw);
+          let loaded = migrate(parsed);
           // V42 — Backfill new TV channels / cable providers when seed expands.
           loaded = ensureTVN(loaded);
           loaded = ensureCP(loaded);
           setStateInner(loaded);
+          // Force immediate persist if chronology migration occurred
+          if (parsed.year > 0 && parsed.year < 1000) {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+          }
         }
       } catch (e) {
         console.warn('load failed', e);
@@ -1101,11 +1161,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             if (!raw) continue;
             try {
               const data = JSON.parse(raw);
+              let yr = data.year || 1;
+              if (yr > 0 && yr < 1000) yr += 1900;
               out.push({
                 name: meta.name,
                 updatedAt: meta.updatedAt,
                 week: data.week || 1,
-                year: data.year || 1,
+                year: yr,
                 studioName: data.player?.name || 'Unknown',
                 cashB: data.player?.cash || 0,
               });
@@ -1207,9 +1269,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         if (!r.error) { setStateInner(r.state); persist(r.state); }
         return { error: r.error };
       },
-      configurePass: (price, name, basicPrice, premiumPrice, adSupported, enabledConsoleIds, catalogProjectIds) => {
+      configurePass: (priceOrLevel, nameOrScope, basicPriceOrAdWave, premiumPriceFallback, adSupportedFallback, enabledConsoleIds, catalogProjectIds) => {
         const cur = stateRef.current; if (!cur) return { error: 'No game.' };
-        const r = configurePassAction(cur, price, name, basicPrice, premiumPrice, adSupported, enabledConsoleIds, catalogProjectIds);
+        const r = configurePassAction(cur, priceOrLevel, nameOrScope, basicPriceOrAdWave, premiumPriceFallback, adSupportedFallback, enabledConsoleIds, catalogProjectIds);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      toggleStudioHQPerk: (studioHQId, perkKey, install) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = toggleStudioHQPerkAction(cur, studioHQId, perkKey, install);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      setStudioHQPolicy: (studioHQId, welfareLevel, crunchPolicy) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = setStudioHQPolicyAction(cur, studioHQId, welfareLevel, crunchPolicy);
         if (!r.error) { setStateInner(r.state); persist(r.state); }
         return { error: r.error };
       },
@@ -1260,6 +1334,127 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const r = researchNextGenAction(cur);
         if (!r.error) { setStateInner(r.state); persist(r.state); }
         return { error: r.error };
+      },
+      proposeGamingDeal: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = proposeGamingDealAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error, deal: r.deal };
+      },
+      processGamingDealResponse: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = processGamingDealResponseAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      createORUpdateGamingPassTier: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = createORUpdateGamingPassTierAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      deleteGamingPassTier: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = deleteGamingPassTierAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      discontinueGamingPassService: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = discontinueGamingPassServiceAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      bundlePassWithStreaming: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = bundlePassWithStreamingAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      createGamingPass: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = createGamingPassAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      renameGamingPass: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = renameGamingPassAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      seedGamingPassTiers: (passId) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = seedGamingPassTiersAction(cur, { passId });
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      buildVideoStore: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = buildVideoStoreAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      bulkBuildVideoStores: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = bulkBuildVideoStoresAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      configureVideoStorePricing: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = configureVideoStorePricingAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      bulkConfigureVideoStorePricing: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = bulkConfigureVideoStorePricingAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      toggleVideoStoreStatus: (storeId) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = toggleVideoStoreStatusAction(cur, storeId);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      stockMovieInVideoStore: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = stockMovieInVideoStoreAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      bulkStockMoviesInVideoStores: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = bulkStockMoviesInVideoStoresAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      proposeVideoClubDeal: (args) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const r = proposeVideoClubDealAction(cur, args);
+        if (!r.error) { setStateInner(r.state); persist(r.state); }
+        return { error: r.error };
+      },
+      toggleGamingProjectHold: (gameProjectId) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const s = { ...cur };
+        s.gamingProjects = (s.gamingProjects || []).map(p => {
+          if (p.id === gameProjectId) {
+            return { ...p, onHold: !p.onHold };
+          }
+          return p;
+        });
+        setStateInner(s); persist(s);
+        return {};
+      },
+      cancelGamingProject: (gameProjectId) => {
+        const cur = stateRef.current; if (!cur) return { error: 'No game.' };
+        const s = { ...cur };
+        s.gamingProjects = (s.gamingProjects || []).filter(p => p.id !== gameProjectId);
+        setStateInner(s); persist(s);
+        return {};
       },
     }}>
       {children}

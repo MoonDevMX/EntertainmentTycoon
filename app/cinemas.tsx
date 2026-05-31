@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useGame } from '../src/game/state';
 import { T } from '../src/ui/theme';
@@ -11,11 +11,12 @@ import { CINEMA_CHAINS, CINEMA_REGIONS, cinemaDealRange, WEEKS_PER_YEAR } from '
 import { OWNED_CINEMA_SPECS, AMENITY_SPECS, TICKET_PRICE_SPECS, FOOD_SPECS, MERCH_SPECS, amenityWeeklyOpex } from '../src/game/sim';
 import type { CinemaRegion, OwnedCinemaSize } from '../src/game/types';
 
-type Tab = 'deals' | 'manager' | 'mine' | 'calendar';
+type Tab = 'deals' | 'manager' | 'mine' | 'calendar' | 'video_clubs';
 const SIZES: OwnedCinemaSize[] = ['small', 'medium', 'large', 'mega'];
 
 export default function CinemasScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const {
     state, signCinemaDeal,
     generateCinemaProposals, approveCinemaProposal, rejectCinemaProposal,
@@ -27,8 +28,34 @@ export default function CinemasScreen() {
     approveCinemaOwnedManagerProposal, rejectCinemaOwnedManagerProposal,
     setEntityMarketing,
     approveCinemaOwnedManagerProposalV2,
+
+    // Physical Video Clubs actions
+    bulkBuildVideoStores,
+    bulkConfigureVideoStorePricing,
+    bulkStockMoviesInVideoStores,
+    toggleVideoStoreStatus
   } = useGame();
   const [tab, setTab] = useState<Tab>('deals');
+  const [distSubTab, setDistSubTab] = useState<'theatrical' | 'video_clubs'>('theatrical');
+
+  useEffect(() => {
+    if (params.tab === 'video_clubs') {
+      setTab('deals');
+      setDistSubTab('video_clubs');
+    } else if (params.tab && ['deals', 'manager', 'mine', 'calendar'].includes(params.tab as string)) {
+      setTab(params.tab as Tab);
+    }
+  }, [params.tab]);
+
+  // Video Clubs state variables
+  const [vstoreBuildPlan, setVstoreBuildPlan] = useState<Record<string, string>>({});
+  const [vstoreSelectedMovieIds, setVstoreSelectedMovieIds] = useState<Set<string>>(new Set());
+  const [vstoreFormat, setVstoreFormat] = useState<'vhs' | 'dvd'>('vhs');
+  const [vstorePricingPreset, setVstorePricingPreset] = useState<'budget' | 'balanced' | 'premium'>('balanced');
+  const [vstoreRentPrice, setVstoreRentPrice] = useState('2.99');
+  const [vstoreBuyPrice, setVstoreBuyPrice] = useState('14.99');
+  const [vstoreFiltersRegions, setVstoreFiltersRegions] = useState<Set<'US' | 'Europe' | 'Asia' | 'LatAm'>>(new Set(['US', 'Europe', 'Asia', 'LatAm']));
+  const [vstoreFiltersSizes, setVstoreFiltersSizes] = useState<Set<'kiosk' | 'boutique' | 'megastore'>>(new Set(['kiosk', 'boutique', 'megastore']));
 
   // Chain-deal negotiation modal state
   const [chainId, setChainId] = useState<string | null>(null);
@@ -271,7 +298,7 @@ export default function CinemasScreen() {
 
       <View style={s.tabDeck}>
         {([
-          { k: 'deals' as Tab, label: 'Deals', icon: 'handshake', badge: 0, color: T.cyan },
+          { k: 'deals' as Tab, label: 'Distribution', icon: 'truck-delivery', badge: (state.videoStores || []).length, color: T.cyan },
           { k: 'manager' as Tab, label: 'Manager', icon: 'robot', badge: proposals.length + ownedMgrProposals.length, color: T.green },
           { k: 'mine' as Tab, label: 'My Cinemas', icon: 'home-city', badge: owned.length, color: T.yellow },
           { k: 'calendar' as Tab, label: 'Calendar', icon: 'calendar-month', badge: 0, color: T.magenta },
@@ -302,19 +329,42 @@ export default function CinemasScreen() {
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 32 }}>
         {tab === 'deals' && (
           <>
-            <View style={s.intro}>
-              <MaterialCommunityIcons name="theater" size={28} color={T.cyan} />
-              <Text style={s.introTxt}>Cinema deals share box office with chain partners. Opening weeks favour studios; later weeks shift to chains.</Text>
+            {/* Distribution Sub-Tabs Selection */}
+            <View style={{ flexDirection: 'row', backgroundColor: '#0F1319', borderRadius: 10, padding: 4, borderWidth: 1, borderColor: T.border, marginBottom: 14 }}>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 6, borderRadius: 8, backgroundColor: distSubTab === 'theatrical' ? T.cyan : 'transparent' }}
+                onPress={() => setDistSubTab('theatrical')}
+                testID="subtab-theatrical"
+              >
+                <MaterialCommunityIcons name="theater" size={16} color={distSubTab === 'theatrical' ? '#000' : T.textMute} />
+                <Text style={{ color: distSubTab === 'theatrical' ? '#000' : T.textMute, fontSize: 11, fontWeight: '900' }}>THEATRICAL DEALS</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 6, borderRadius: 8, backgroundColor: distSubTab === 'video_clubs' ? T.cyan : 'transparent' }}
+                onPress={() => setDistSubTab('video_clubs')}
+                testID="subtab-video_clubs"
+              >
+                <MaterialCommunityIcons name="television-classic" size={16} color={distSubTab === 'video_clubs' ? '#000' : T.textMute} />
+                <Text style={{ color: distSubTab === 'video_clubs' ? '#000' : T.textMute, fontSize: 11, fontWeight: '900' }}>VIDEO CLUBS / HOME MEDIA ({state.videoStores?.length || 0})</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-              <TouchableOpacity style={[s.modeBtn, !bulkMode && { backgroundColor: T.cyan }]} onPress={() => setBulkMode(false)} testID="mode-single">
-                <Text style={[s.modeBtnTxt, !bulkMode && { color: T.cardDark }]}>SINGLE NEGOTIATION</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.modeBtn, bulkMode && { backgroundColor: T.green }]} onPress={() => setBulkMode(true)} testID="mode-bulk">
-                <Text style={[s.modeBtnTxt, bulkMode && { color: T.cardDark }]}>BULK SIGN</Text>
-              </TouchableOpacity>
-            </View>
+            {distSubTab === 'theatrical' && (
+              <>
+                <View style={s.intro}>
+                  <MaterialCommunityIcons name="theater" size={28} color={T.cyan} />
+                  <Text style={s.introTxt}>Cinema deals share box office with chain partners. Opening weeks favour studios; later weeks shift to chains.</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity style={[s.modeBtn, !bulkMode && { backgroundColor: T.cyan }]} onPress={() => setBulkMode(false)} testID="mode-single">
+                    <Text style={[s.modeBtnTxt, !bulkMode && { color: T.cardDark }]}>SINGLE NEGOTIATION</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.modeBtn, bulkMode && { backgroundColor: T.green }]} onPress={() => setBulkMode(true)} testID="mode-bulk">
+                    <Text style={[s.modeBtnTxt, bulkMode && { color: T.cardDark }]}>BULK SIGN</Text>
+                  </TouchableOpacity>
+                </View>
 
             {bulkMode ? (
               <>
@@ -390,6 +440,8 @@ export default function CinemasScreen() {
             })}
           </>
         )}
+      </>
+    )}
 
         {tab === 'manager' && (
           <>
@@ -831,6 +883,457 @@ export default function CinemasScreen() {
               <Text style={s.preLicTitle}>🔒 Release Window Guard</Text>
               <Text style={s.preLicTxt}>Movies can only be scheduled at or after their production release date. Filming/coming-soon titles cannot be scheduled before they finish production.</Text>
             </View>
+          </>
+        )}
+
+        {tab === 'video_clubs' && (
+          <>
+            <View style={[s.intro, { borderColor: '#A855F7' }]}>
+              <MaterialCommunityIcons name="television-classic" size={28} color="#A855F7" />
+              <Text style={s.introTxt}>
+                Welcome to the Physical Retail Division! Operate your own chains of VHS 📼 and DVD 📀 rental stores. VHS is available at any time. DVDs unlock after Year 1997. Stock your movies in bulk and set custom pricing across multiple stores!
+              </Text>
+            </View>
+
+            {/* BULK BUILDING */}
+            <SectionHeader title="Bulk-Build Old-School Video Clubs" />
+            <View style={s.buildBox}>
+              <Text style={s.buildHeader}>Specify how many of each store tier you wish to construct in bulk per region.</Text>
+              
+              <View style={s.specRow}>
+                <View style={[s.specCol, { borderLeftColor: '#A855F7', borderLeftWidth: 3 }]}>
+                  <Text style={s.specLbl}>KIOSK</Text>
+                  <Text style={s.specVal}>$2M</Text>
+                  <Text style={s.specOpex}>Opex: $40K/wk</Text>
+                </View>
+                <View style={[s.specCol, { borderLeftColor: '#D946EF', borderLeftWidth: 3 }]}>
+                  <Text style={s.specLbl}>BOUTIQUE</Text>
+                  <Text style={s.specVal}>$8M</Text>
+                  <Text style={s.specOpex}>Opex: $150K/wk</Text>
+                </View>
+                <View style={[s.specCol, { borderLeftColor: '#3B82F6', borderLeftWidth: 3 }]}>
+                  <Text style={s.specLbl}>MEGASTORE</Text>
+                  <Text style={s.specVal}>$30M</Text>
+                  <Text style={s.specOpex}>Opex: $450K/wk</Text>
+                </View>
+              </View>
+
+              {['US', 'Europe', 'Asia', 'LatAm'].map((region) => (
+                <View key={region} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#202530' }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', width: 70 }}>{region}</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
+                    {['kiosk', 'boutique', 'megastore'].map((size) => {
+                      const key = `${region}|${size}`;
+                      return (
+                        <View key={size} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1D24', borderRadius: 6, borderWidth: 1, borderColor: '#30363D', paddingHorizontal: 6, width: 90 }}>
+                          <Text style={{ color: T.textMute, fontSize: 10, marginRight: 4, width: 32 }}>{size.slice(0, 3).toUpperCase()}:</Text>
+                          <TextInput
+                            value={vstoreBuildPlan[key] || ''}
+                            onChangeText={(val) => {
+                              setVstoreBuildPlan(prev => ({
+                                ...prev,
+                                [key]: val.replace(/[^0-9]/g, '')
+                              }));
+                            }}
+                            placeholder="0"
+                            placeholderTextColor={T.textMute}
+                            keyboardType="numeric"
+                            style={{ color: '#fff', fontSize: 13, paddingVertical: 4, flex: 1 }}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#A855F7',
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  marginTop: 15,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+                onPress={() => {
+                  const buildMap: Record<string, number> = {};
+                  Object.entries(vstoreBuildPlan).forEach(([k, v]) => {
+                    const count = parseInt(v, 10);
+                    if (count > 0) buildMap[k] = count;
+                  });
+
+                  const res = bulkBuildVideoStores({ buildPlan: buildMap });
+                  if (res.error) {
+                    uiAlert('Failed to Build', res.error);
+                  } else {
+                    uiAlert('Successfully Built! 📼', 'Your video clubs have been established. Time to stock tapes prestinely!');
+                    setVstoreBuildPlan({});
+                  }
+                }}
+              >
+                <MaterialCommunityIcons name="office-building" size={20} color="#000" />
+                <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>CONSTRUCT CLUBS IN BULK</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* BULK PRICING */}
+            <SectionHeader title="Bulk-Configure Store Rental Pricing" />
+            <View style={{ backgroundColor: '#161920', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#303440', marginBottom: 16 }}>
+              <Text style={{ color: T.textMute, fontSize: 12, marginBottom: 12 }}>
+                Update pricing structures for your owned video stores in matching selected criteria at once.
+              </Text>
+
+              {/* Targets filters */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 6 }}>REGIONS MATCH</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    {['US', 'Europe', 'Asia', 'LatAm'].map((reg) => {
+                      const typedReg = reg as 'US' | 'Europe' | 'Asia' | 'LatAm';
+                      const selected = vstoreFiltersRegions.has(typedReg);
+                      return (
+                        <TouchableOpacity
+                          key={reg}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 4,
+                            backgroundColor: selected ? '#A855F7' : '#1F242F',
+                            borderWidth: 1,
+                            borderColor: selected ? '#A855F7' : '#30363D'
+                          }}
+                          onPress={() => {
+                            setVstoreFiltersRegions(prev => {
+                              const next = new Set(prev);
+                              if (next.has(typedReg)) {
+                                if (next.size > 1) next.delete(typedReg);
+                              } else {
+                                next.add(typedReg);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <Text style={{ color: selected ? '#000' : '#fff', fontSize: 10, fontWeight: '700' }}>{reg}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 6 }}>SIZES MATCH</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                    {['kiosk', 'boutique', 'megastore'].map((sz) => {
+                      const typedSz = sz as 'kiosk' | 'boutique' | 'megastore';
+                      const selected = vstoreFiltersSizes.has(typedSz);
+                      return (
+                        <TouchableOpacity
+                          key={sz}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 4,
+                            backgroundColor: selected ? '#A855F7' : '#1F242F',
+                            borderWidth: 1,
+                            borderColor: selected ? '#A855F7' : '#30363D'
+                          }}
+                          onPress={() => {
+                            setVstoreFiltersSizes(prev => {
+                              const next = new Set(prev);
+                              if (next.has(typedSz)) {
+                                if (next.size > 1) next.delete(typedSz);
+                              } else {
+                                next.add(typedSz);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <Text style={{ color: selected ? '#000' : '#fff', fontSize: 10, fontWeight: '700' }}>{sz.toUpperCase()}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+
+              {/* Standard presets cards */}
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>PRICING PRESET</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
+                {[
+                  { key: 'budget' as const, label: 'Budget', desc: 'Rent $0.99 / Buy $4.99', rPrice: '0.99', bPrice: '4.99' },
+                  { key: 'balanced' as const, label: 'Balanced', desc: 'Rent $2.99 / Buy $14.99', rPrice: '2.99', bPrice: '14.99' },
+                  { key: 'premium' as const, label: 'Premium', desc: 'Rent $5.99 / Buy $29.99', rPrice: '5.99', bPrice: '29.99' }
+                ].map((preset) => {
+                  const active = vstorePricingPreset === preset.key;
+                  return (
+                    <TouchableOpacity
+                      key={preset.key}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 6,
+                        backgroundColor: active ? 'rgba(168, 85, 247, 0.15)' : '#1F242F',
+                        borderWidth: 1,
+                        borderColor: active ? '#A855F7' : '#30363D'
+                      }}
+                      onPress={() => {
+                        setVstorePricingPreset(preset.key);
+                        setVstoreRentPrice(preset.rPrice);
+                        setVstoreBuyPrice(preset.bPrice);
+                      }}
+                    >
+                      <Text style={{ color: active ? '#A855F7' : '#fff', fontSize: 12, fontWeight: '800' }}>{preset.label}</Text>
+                      <Text style={{ color: T.textMute, fontSize: 10, marginTop: 4 }}>{preset.desc}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Manual tuning */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 4 }}>RENTAL PRICE ($)</Text>
+                  <TextInput
+                    value={vstoreRentPrice}
+                    onChangeText={setVstoreRentPrice}
+                    keyboardType="decimal-pad"
+                    style={{ backgroundColor: '#1F242F', color: '#fff', borderRadius: 6, padding: 10, fontSize: 13, borderWidth: 1, borderColor: '#30363D' }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 4 }}>BUYOUT PURCHASE PRICE ($)</Text>
+                  <TextInput
+                    value={vstoreBuyPrice}
+                    onChangeText={setVstoreBuyPrice}
+                    keyboardType="decimal-pad"
+                    style={{ backgroundColor: '#1F242F', color: '#fff', borderRadius: 6, padding: 10, fontSize: 13, borderWidth: 1, borderColor: '#30363D' }}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#A855F7',
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+                onPress={() => {
+                  const rp = parseFloat(vstoreRentPrice);
+                  const bp = parseFloat(vstoreBuyPrice);
+                  if (isNaN(rp) || isNaN(bp)) {
+                    uiAlert('Invalid Values', 'Pleas enter correct decimal values for Rent and Purchase prices.');
+                    return;
+                  }
+
+                  const res = bulkConfigureVideoStorePricing({
+                    pricingTier: vstorePricingPreset,
+                    rentCost: rp,
+                    buyCost: bp,
+                    regions: Array.from(vstoreFiltersRegions),
+                    sizes: Array.from(vstoreFiltersSizes)
+                  });
+
+                  if (res.error) uiAlert('Error', res.error);
+                  else uiAlert('Pricing Updated! 🏷️', 'Assigned bulk pricing configurations to all filtered stores.');
+                }}
+              >
+                <MaterialCommunityIcons name="tag-multiple" size={20} color="#000" />
+                <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>APPLY PRICING PRESET</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* BULK STOCKING */}
+            <SectionHeader title="Bulk-Stock Movies Library" />
+            <View style={{ backgroundColor: '#161920', padding: 15, borderRadius: 10, borderColor: '#303440', borderWidth: 1, marginBottom: 16 }}>
+              <Text style={{ color: T.textMute, fontSize: 12, marginBottom: 12 }}>
+                High density film catalog deployment. Select a format, highlight movies, and deploy them across multiple stores at once!
+              </Text>
+
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 6 }}>STOCK FORMAT SELECTOR</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 15 }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 6,
+                    backgroundColor: vstoreFormat === 'vhs' ? 'rgba(168, 85, 247, 0.15)' : '#1F242F',
+                    borderWidth: 1,
+                    borderColor: vstoreFormat === 'vhs' ? '#A855F7' : '#30363D',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => setVstoreFormat('vhs')}
+                >
+                  <MaterialCommunityIcons name="tape" size={22} color={vstoreFormat === 'vhs' ? '#A855F7' : '#fff'} />
+                  <Text style={{ color: vstoreFormat === 'vhs' ? '#A855F7' : '#fff', fontSize: 12, fontWeight: '800', marginTop: 4 }}>VHS Tapes (Classic)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 6,
+                    backgroundColor: vstoreFormat === 'dvd' ? 'rgba(168, 85, 247, 0.15)' : '#1F242F',
+                    borderWidth: 1,
+                    borderColor: vstoreFormat === 'dvd' ? '#A855F7' : '#30363D',
+                    alignItems: 'center',
+                    opacity: state.year < 1997 ? 0.5 : 1
+                  }}
+                  disabled={state.year < 1997}
+                  onPress={() => setVstoreFormat('dvd')}
+                >
+                  <MaterialCommunityIcons name="disc" size={22} color={vstoreFormat === 'dvd' ? '#A855F7' : '#fff'} />
+                  <Text style={{ color: vstoreFormat === 'dvd' ? '#A855F7' : '#fff', fontSize: 12, fontWeight: '800', marginTop: 4 }}>
+                    DVD Discs {state.year < 1997 ? '(Locked < 1997)' : '(Unlocked!)'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginBottom: 6 }}>CHOOSE THE MOVIES TO STOCK:</Text>
+              
+              {/* Releases List */}
+              {playerMovies.length === 0 ? (
+                <Text style={{ color: T.textMute, fontStyle: 'italic', marginVertical: 10 }}>No movies completed yet. Propose projects in your studio dashboard first.</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 6, marginBottom: 15, paddingBottom: 6 }}>
+                  {playerMovies.map((m) => {
+                    const isSelected = vstoreSelectedMovieIds.has(m.id);
+                    return (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={{
+                          width: 120,
+                          padding: 8,
+                          borderRadius: 8,
+                          backgroundColor: isSelected ? 'rgba(168, 85, 247, 0.25)' : '#1F242F',
+                          borderWidth: 2,
+                          borderColor: isSelected ? '#A855F7' : '#30363D',
+                          justifyContent: 'center',
+                          marginRight: 8
+                        }}
+                        onPress={() => {
+                          setVstoreSelectedMovieIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(m.id)) next.delete(m.id);
+                            else next.add(m.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <View style={{ width: '100%', height: 64, borderRadius: 6, backgroundColor: m.iconBg || T.magenta, alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                          <MaterialCommunityIcons name={m.iconKey as any || 'movie-roll'} size={24} color="#fff" />
+                        </View>
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', textAlign: 'center' }} numberOfLines={1}>{m.title}</Text>
+                        <Text style={{ color: T.textMute, fontSize: 9, textAlign: 'center', marginTop: 2 }}>{m.genre}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#A855F7',
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: vstoreSelectedMovieIds.size === 0 ? 0.6 : 1
+                }}
+                disabled={vstoreSelectedMovieIds.size === 0}
+                onPress={() => {
+                  const res = bulkStockMoviesInVideoStores({
+                    movieIds: Array.from(vstoreSelectedMovieIds),
+                    format: vstoreFormat,
+                    regions: Array.from(vstoreFiltersRegions),
+                    sizes: Array.from(vstoreFiltersSizes)
+                  });
+
+                  if (res.error) uiAlert('Stocking Locked', res.error);
+                  else {
+                    uiAlert('Catalog Stocked! ⚡', 'Dispatched selected titles to all matching physical outlets.');
+                    setVstoreSelectedMovieIds(new Set());
+                  }
+                }}
+              >
+                <MaterialCommunityIcons name="database-sync" size={20} color="#000" />
+                <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>STOCK {vstoreSelectedMovieIds.size} FILMS IN FILTERED CLUBS</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* MY CLUBS LIST */}
+            <SectionHeader title={`My Video Stores / Clubs Grid (${(state.videoStores || []).length} Operational)`} />
+            {(state.videoStores || []).length === 0 ? (
+              <View style={{ padding: 30, backgroundColor: '#161920', borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#303440' }}>
+                <MaterialCommunityIcons name="television-off" size={48} color={T.textMute} />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800', marginTop: 10 }}>No Operational Outlets</Text>
+                <Text style={{ color: T.textMute, fontSize: 11, textAlign: 'center', marginTop: 4 }}>Build video clubs above to capture physical rental marketplace revenues!</Text>
+              </View>
+            ) : (
+              (state.videoStores || []).map((store) => {
+                const isPlayer = (store.ownerStudioId || state.player.id) === state.player.id;
+                const formattedRev = (store.weeklyRevenueB * 1000).toFixed(2);
+                return (
+                  <View key={store.id} style={{ backgroundColor: '#161920', borderWidth: 1, borderColor: isPlayer ? '#A855F7' : '#2A2C35', padding: 12, borderRadius: 10, marginBottom: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <MaterialCommunityIcons name="storefront" size={22} color={isPlayer ? '#A855F7' : T.textMute} />
+                        <View>
+                          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>{store.name}</Text>
+                          <Text style={{ color: T.textMute, fontSize: 10 }}>{store.size.toUpperCase()} · Location: {store.region}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 4,
+                          backgroundColor: store.status === 'active' ? '#10B98122' : '#EF444422',
+                          borderWidth: 1,
+                          borderColor: store.status === 'active' ? '#10B981' : '#EF4444'
+                        }}
+                        onPress={() => {
+                          if (isPlayer) {
+                            toggleVideoStoreStatus(store.id);
+                          }
+                        }}
+                      >
+                        <Text style={{ color: store.status === 'active' ? '#10B981' : '#EF4444', fontSize: 10, fontWeight: '800' }}>{store.status.toUpperCase()}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#202530', paddingTop: 8, marginTop: 8 }}>
+                      <View>
+                        <Text style={{ color: T.textMute, fontSize: 9 }}>CUSTOMERS</Text>
+                        <Text style={{ color: T.cyan, fontSize: 11, fontWeight: '700' }}>{(store.customerBaseM || 0).toFixed(2)}M</Text>
+                      </View>
+                      <View>
+                        <Text style={{ color: T.textMute, fontSize: 9 }}>PRICING</Text>
+                        <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>${store.rentCostUSD} rent / ${store.buyCostUSD} buy</Text>
+                      </View>
+                      <View>
+                        <Text style={{ color: T.textMute, fontSize: 9 }}>STOCKED (VHS/DVD)</Text>
+                        <Text style={{ color: T.magenta, fontSize: 11, fontWeight: '700' }}>{(store.vhsStockIds || []).length} 📼 / {(store.dvdStockIds || []).length} 📀</Text>
+                      </View>
+                      <View>
+                        <Text style={{ color: T.textMute, fontSize: 9 }}>REV/WK</Text>
+                        <Text style={{ color: T.green, fontSize: 11, fontWeight: '700' }}>${formattedRev}M</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </>
         )}
       </ScrollView>

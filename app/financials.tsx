@@ -40,9 +40,11 @@ export default function FinancialsScreen() {
       cableIn: 0, playerCable: 0, packs: 0,
       licIn: 0, ipIn: 0, crossIn: 0,
       gameSales: 0, gamePassSubs: 0, gameEngineLic: 0,
+      vstoreRev: 0,
       cinemaOpex: 0, serverCost: 0, broadcast: 0, carriageOut: 0,
       prod: 0, mkt: 0, licOut: 0, ipOut: 0, crossOut: 0,
       hardwareOpex: 0, studioOpex: 0,
+      vstoreOpex: 0,
       moviesRel: 0, seriesRel: 0, awards: 0, noms: 0,
     };
     window.forEach(w => {
@@ -55,20 +57,22 @@ export default function FinancialsScreen() {
       acc.gameSales += (w as any).gameSalesInB || 0;
       acc.gamePassSubs += (w as any).gamePassSubsInB || 0;
       acc.gameEngineLic += (w as any).gameEngineLicensingInB || 0;
+      acc.vstoreRev += (w as any).vstoreRevB || 0;
       acc.cinemaOpex += w.cinemaOpexB; acc.serverCost += w.streamingServerB;
       acc.broadcast += w.tvBroadcastB; acc.carriageOut += w.cableCarriageOutB;
       acc.prod += w.productionCostB; acc.mkt += w.marketingCostB;
       acc.licOut += w.licensingOutB; acc.ipOut += w.ipRoyaltiesOutB; acc.crossOut += w.crossoverOutB;
       acc.hardwareOpex += (w as any).gamingHardwareOpexB || 0;
       acc.studioOpex += (w as any).gamingStudioOpexB || 0;
+      acc.vstoreOpex += (w as any).vstoreOpexB || 0;
       acc.moviesRel += w.moviesReleased; acc.seriesRel += w.seriesReleased;
       acc.awards += w.awardsWeek; acc.noms += w.nominationsWeek;
     });
     acc.revenue = acc.cinemaBO + acc.ownedCinema + acc.streamSubs + acc.streamAds + acc.tvSubs + acc.tvAds
       + acc.cableIn + acc.playerCable + acc.packs + acc.licIn + acc.ipIn + acc.crossIn
-      + acc.gameSales + acc.gamePassSubs + acc.gameEngineLic;
+      + acc.gameSales + acc.gamePassSubs + acc.gameEngineLic + acc.vstoreRev;
     acc.costs = acc.cinemaOpex + acc.serverCost + acc.broadcast + acc.carriageOut + acc.prod + acc.mkt
-      + acc.licOut + acc.ipOut + acc.crossOut + acc.hardwareOpex + acc.studioOpex;
+      + acc.licOut + acc.ipOut + acc.crossOut + acc.hardwareOpex + acc.studioOpex + acc.vstoreOpex;
     return acc;
   }, [window]);
 
@@ -142,6 +146,7 @@ export default function FinancialsScreen() {
         <BreakdownRow label="Gaming — Core Software Sales" value={totals.gameSales} color={T.cyan} icon="gamepad-variant" total={totals.revenue} />
         <BreakdownRow label="Gaming — Game Pass Subs" value={totals.gamePassSubs} color={T.cyan} icon="card-account-details-star" total={totals.revenue} />
         <BreakdownRow label="Gaming — Engine Licensing" value={totals.gameEngineLic} color={T.cyan} icon="cpu" total={totals.revenue} />
+        <BreakdownRow label="Video Clubs — Direct Tape Sales" value={totals.vstoreRev} color={T.magenta} icon="disc" total={totals.revenue} />
 
         {/* Costs Breakdown */}
         <Text style={s.section}>COSTS BREAKDOWN</Text>
@@ -156,6 +161,7 @@ export default function FinancialsScreen() {
         <BreakdownRow label="Crossover Fees Paid" value={totals.crossOut} color={T.red} icon="shuffle-variant" total={totals.costs} />
         <BreakdownRow label="Gaming — HW Production Opex" value={totals.hardwareOpex} color={T.red} icon="robot-industrial" total={totals.costs} />
         <BreakdownRow label="Gaming — Specialized Studio Opex" value={totals.studioOpex} color={T.red} icon="office-building" total={totals.costs} />
+        <BreakdownRow label="Video Clubs — Retail Store Opex" value={totals.vstoreOpex} color={T.red} icon="store" total={totals.costs} />
 
         {/* Per-week timeline */}
         <Text style={s.section}>PER-WEEK TIMELINE</Text>
@@ -197,6 +203,7 @@ export default function FinancialsScreen() {
                   {((w as any).gameSalesInB || 0) > 0 && <MiniRow label="Game Sales" v={(w as any).gameSalesInB} c={T.cyan} />}
                   {((w as any).gamePassSubsInB || 0) > 0 && <MiniRow label="Game Pass" v={(w as any).gamePassSubsInB} c={T.cyan} />}
                   {((w as any).gameEngineLicensingInB || 0) > 0 && <MiniRow label="Engine Licenses" v={(w as any).gameEngineLicensingInB} c={T.cyan} />}
+                  {((w as any).vstoreRevB || 0) > 0 && <MiniRow label="Video Club Sales" v={(w as any).vstoreRevB} c={T.magenta} />}
                   {w.cinemaOpexB > 0 && <MiniRow label="− Cinema Opex" v={-w.cinemaOpexB} c={T.red} />}
                   {w.streamingServerB > 0 && <MiniRow label="− Streaming Servers" v={-w.streamingServerB} c={T.red} />}
                   {w.tvBroadcastB > 0 && <MiniRow label="− TV Broadcast" v={-w.tvBroadcastB} c={T.red} />}
@@ -205,6 +212,7 @@ export default function FinancialsScreen() {
                   {w.marketingCostB > 0 && <MiniRow label="− Marketing" v={-w.marketingCostB} c={T.red} />}
                   {((w as any).gamingHardwareOpexB || 0) > 0 && <MiniRow label="− Gaming HW Opex" v={-(w as any).gamingHardwareOpexB} c={T.red} />}
                   {((w as any).gamingStudioOpexB || 0) > 0 && <MiniRow label="− Gaming Studio Opex" v={-(w as any).gamingStudioOpexB} c={T.red} />}
+                  {((w as any).vstoreOpexB || 0) > 0 && <MiniRow label="− Video Store Opex" v={-(w as any).vstoreOpexB} c={T.red} />}
                 </View>
               )}
             </TouchableOpacity>

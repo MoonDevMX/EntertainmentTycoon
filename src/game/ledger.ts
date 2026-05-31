@@ -18,9 +18,11 @@ export function freshLedger(week: number, year: number): WeeklyLedger {
     cableCarriageInB: 0, playerCableSubsInB: 0,
     channelPacksInB: 0,
     licensingInB: 0, ipRoyaltiesInB: 0, crossoverInB: 0, miscInB: 0,
+    vstoreRevB: 0,
     cinemaOpexB: 0, streamingServerB: 0, tvBroadcastB: 0,
     cableCarriageOutB: 0, productionCostB: 0, marketingCostB: 0,
     licensingOutB: 0, ipRoyaltiesOutB: 0, crossoverOutB: 0, miscOutB: 0,
+    vstoreOpexB: 0,
     moviesReleased: 0, seriesReleased: 0,
     nominationsWeek: 0, awardsWeek: 0,
   };
@@ -55,11 +57,13 @@ export function startRecap(state: GameState): PendingRecap {
       cableCarriageInB: 0, playerCableSubsInB: 0,
       channelPacksInB: 0,
       licensingInB: 0, ipRoyaltiesInB: 0, crossoverInB: 0, miscInB: 0,
+      vstoreRevB: 0,
     },
     outflows: {
       cinemaOpexB: 0, streamingServerB: 0, tvBroadcastB: 0,
       cableCarriageOutB: 0, productionCostB: 0, marketingCostB: 0,
       licensingOutB: 0, ipRoyaltiesOutB: 0, crossoverOutB: 0, miscOutB: 0,
+      vstoreOpexB: 0,
     },
     moviesReleased: 0, seriesReleased: 0,
     nominationsWeek: 0, awardsWeek: 0,
@@ -100,6 +104,7 @@ export function finalizeWeek(state: GameState): GameState {
       ipRoyaltiesInB: +(recap.inflows.ipRoyaltiesInB + ledger.ipRoyaltiesInB).toFixed(4),
       crossoverInB: +(recap.inflows.crossoverInB + ledger.crossoverInB).toFixed(4),
       miscInB: +(recap.inflows.miscInB + ledger.miscInB).toFixed(4),
+      vstoreRevB: +(((recap.inflows as any).vstoreRevB || 0) + (ledger.vstoreRevB || 0)).toFixed(4),
     },
     outflows: {
       cinemaOpexB: +(recap.outflows.cinemaOpexB + ledger.cinemaOpexB).toFixed(4),
@@ -112,6 +117,7 @@ export function finalizeWeek(state: GameState): GameState {
       ipRoyaltiesOutB: +(recap.outflows.ipRoyaltiesOutB + ledger.ipRoyaltiesOutB).toFixed(4),
       crossoverOutB: +(recap.outflows.crossoverOutB + ledger.crossoverOutB).toFixed(4),
       miscOutB: +(recap.outflows.miscOutB + ledger.miscOutB).toFixed(4),
+      vstoreOpexB: +(((recap.outflows as any).vstoreOpexB || 0) + (ledger.vstoreOpexB || 0)).toFixed(4),
     },
     moviesReleased: recap.moviesReleased + ledger.moviesReleased,
     seriesReleased: recap.seriesReleased + ledger.seriesReleased,
@@ -124,17 +130,18 @@ export function finalizeWeek(state: GameState): GameState {
 
 // Helper: sum total inflows from a PendingRecap.
 export function sumInflowsB(recap: PendingRecap): number {
-  const i = recap.inflows;
+  const i = recap.inflows as any;
   return i.cinemaBoxOfficeInB + i.ownedCinemaRevB + i.streamingSubsInB + i.streamingAdsInB
     + i.tvNetworkSubsInB + i.tvNetworkAdsInB + i.cableCarriageInB + i.playerCableSubsInB
-    + i.channelPacksInB + i.licensingInB + i.ipRoyaltiesInB + i.crossoverInB + i.miscInB;
+    + i.channelPacksInB + i.licensingInB + i.ipRoyaltiesInB + i.crossoverInB + i.miscInB
+    + (i.vstoreRevB || 0);
 }
 
 export function sumOutflowsB(recap: PendingRecap): number {
-  const o = recap.outflows;
+  const o = recap.outflows as any;
   return o.cinemaOpexB + o.streamingServerB + o.tvBroadcastB + o.cableCarriageOutB
     + o.productionCostB + o.marketingCostB + o.licensingOutB + o.ipRoyaltiesOutB
-    + o.crossoverOutB + o.miscOutB;
+    + o.crossoverOutB + o.miscOutB + (o.vstoreOpexB || 0);
 }
 
 export function clearPendingRecap(state: GameState): GameState {

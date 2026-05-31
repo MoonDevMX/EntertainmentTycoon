@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ScrollView, Modal, Platform, Alert, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ScrollView, Modal, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useMemo, useEffect } from 'react';
@@ -10,10 +10,10 @@ import { TopBar, Avatar } from '../src/ui/components';
 import { ColorTrait, Gender, Talent, Role } from '../src/game/types';
 import { COLORS, COLOR_HEX, COLOR_LABEL, effectiveSkillFor } from '../src/game/data';
 import { calculateTalentExpectations, calculateAcceptance, talentAvailability } from '../src/game/sim';
+import { uiAlert } from '../src/ui/ui-alert';
 
 function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
+  uiAlert(title, msg);
 }
 
 type RoleFilter = 'all' | 'writer' | 'director' | 'actor' | 'actress';
@@ -130,7 +130,7 @@ export default function TalentScreen() {
         return true;
       });
       // Cast: filter out talents already chosen in OTHER cast slots (prevents duplicates within the same movie)
-      if (selectMode === 'cast' && typeof castIdx === 'number') {
+      if (selectMode === 'cast' && typeof castIdx === 'number' && !isNaN(castIdx)) {
         const usedIds = new Set(draft.cast.map((c, i) => i !== castIdx ? c.talentId : undefined).filter(Boolean) as string[]);
         // Also exclude writer/director already picked (no double-dipping crew↔cast)
         if (draft.writerId) usedIds.add(draft.writerId);
@@ -247,7 +247,7 @@ export default function TalentScreen() {
       setDraft({ writerId: talent.id });
     } else if (selectMode === 'director') {
       setDraft({ directorId: talent.id });
-    } else if (selectMode === 'cast' && typeof castIdx === 'number') {
+    } else if (selectMode === 'cast' && typeof castIdx === 'number' && !isNaN(castIdx)) {
       const nextCast = draft.cast.map((c, i) => i === castIdx ? { ...c, talentId: talent.id } : c);
       setDraft({ cast: nextCast });
     }

@@ -128,7 +128,7 @@ export default function MySeriesScreen() {
             <TextInput value={renewBudget} onChangeText={(v) => setRenewBudget(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" maxLength={5} style={s.inp} testID="renew-budget" />
             <TouchableOpacity style={s.submit} onPress={doRenew} testID="renew-submit">
               <MaterialCommunityIcons name="movie-roll" size={20} color={T.cardDark} />
-              <Text style={s.submitTxt}>RENEW (${((parseFloat(renewBudget) || 0) / 1000).toFixed(2)}B)</Text>
+              <Text style={s.submitTxt}>RENEW (${(parseFloat(renewBudget) || 0).toFixed(1)}M)</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>

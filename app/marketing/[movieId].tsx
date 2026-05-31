@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useMemo, useEffect } from 'react';
@@ -7,10 +7,10 @@ import { useGame } from '../../src/game/state';
 import { T } from '../../src/ui/theme';
 import { TopBar, IconTile } from '../../src/ui/components';
 import { MARKETING_CHANNELS, ageWeightsForSegment, computeMarketingEfficiency, AgeBand } from '../../src/game/marketing';
+import { uiAlert } from '../../src/ui/ui-alert';
 
 function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
+  uiAlert(title, msg);
 }
 
 const PRESETS: { key: string; label: string; icon: string; channels: string[] }[] = [

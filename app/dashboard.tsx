@@ -6,7 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useGame } from '../src/game/state';
 import { T } from '../src/ui/theme';
 import { NeonStat, SectionHeader } from '../src/ui/components';
-import { monthOf, nextHolidays } from '../src/game/data';
+import { monthOf, nextHolidays, COLOR_HEX, GENRES } from '../src/game/data';
 import { WeeklyRecapModal } from '../src/ui/WeeklyRecapModal';
 import { uiAlert } from '../src/ui/ui-alert';
 import { 
@@ -17,6 +17,13 @@ import {
   ROLE_WEEKLY_SALARY 
 } from '../src/game/gaming';
 import { GameEngineModule, GamingStudioType, GamingProject } from '../src/game/types';
+
+function fmtB(b: number): string {
+  const abs = Math.abs(b);
+  if (abs >= 1) return `$${b.toFixed(2)}B`;
+  if (abs >= 0.001) return `$${(b * 1000).toFixed(1)}M`;
+  return `$${(b * 1000 * 1000).toFixed(0)}K`;
+}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -36,9 +43,14 @@ export default function Dashboard() {
     buildHQRoom, 
     recruitGamingStaff, 
     configurePass, 
-    createMovieFromGame
+    createMovieFromGame,
+    setEntityMarketing,
+    setMarketingAutoBulk
   } = useGame();
-  const [activeTab, setActiveTab] = useState<'production' | 'empires' | 'reports'>('production');
+  const [activeTab, setActiveTab] = useState<'production' | 'empires' | 'reports' | 'financials' | 'marketing' | 'demographics'>('production');
+  const [finRange, setFinRange] = useState<4 | 12 | 24 | 48 | 200>(12);
+  const [finExpandedWeek, setFinExpandedWeek] = useState<string | null>(null);
+  const [mktTab, setMktTab] = useState<'movies' | 'series'>('movies');
   const [activeDivision, setActiveDivision] = useState<'cinema' | 'gaming'>('cinema');
   const [activeGamingTab, setActiveGamingTab] = useState<'studios' | 'pipeline' | 'engines' | 'consoles' | 'gamepass' | 'trends'>('studios');
 
@@ -319,7 +331,7 @@ export default function Dashboard() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[s.divisionToggleBtn, activeDivision === 'gaming' && s.divisionToggleBtnActive]}
-            onPress={() => setActiveDivision('gaming')}
+            onPress={() => router.push('/gaming' as any)}
           >
             <MaterialCommunityIcons name="gamepad-variant" size={18} color={activeDivision === 'gaming' ? '#000' : T.textMute} />
             <Text style={[s.divisionToggleTxt, activeDivision === 'gaming' && s.divisionToggleTxtActive]}>GAMING DIVISION</Text>
@@ -354,31 +366,57 @@ export default function Dashboard() {
         {/* Custom Tabbed Dept Selection Bar */}
         {activeDivision === 'cinema' && (
           <>
-            <View style={s.tabDeck}>
-              <TouchableOpacity 
-                onPress={() => setActiveTab('production')} 
-                style={[s.tabButton, activeTab === 'production' && { borderBottomColor: T.cyan, borderBottomWidth: 3 }]}
-                testID="tab-production"
-              >
-                <MaterialCommunityIcons name="movie-roll" size={20} color={activeTab === 'production' ? T.cyan : T.textMute} />
-                <Text style={[s.tabButtonText, activeTab === 'production' && { color: T.cyan }]}>STUDIO</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => setActiveTab('empires')} 
-                style={[s.tabButton, activeTab === 'empires' && { borderBottomColor: T.yellow, borderBottomWidth: 3 }]}
-                testID="tab-empires"
-              >
-                <MaterialCommunityIcons name="web" size={20} color={activeTab === 'empires' ? T.yellow : T.textMute} />
-                <Text style={[s.tabButtonText, activeTab === 'empires' && { color: T.yellow }]}>DISTRIBUTION</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => setActiveTab('reports')} 
-                style={[s.tabButton, activeTab === 'reports' && { borderBottomColor: T.green, borderBottomWidth: 3 }]}
-                testID="tab-reports"
-              >
-                <MaterialCommunityIcons name="compass-outline" size={20} color={activeTab === 'reports' ? T.green : T.textMute} />
-                <Text style={[s.tabButtonText, activeTab === 'reports' && { color: T.green }]}>MARKET INTEL</Text>
-              </TouchableOpacity>
+            <View style={{ borderBottomWidth: 1.5, borderBottomColor: T.border, marginTop: 20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 6 }}>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('production')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'production' && { borderBottomColor: T.cyan, borderBottomWidth: 3 }]}
+                  testID="tab-production"
+                >
+                  <MaterialCommunityIcons name="movie-roll" size={18} color={activeTab === 'production' ? T.cyan : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'production' && { color: T.cyan }]}>STUDIO</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('empires')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'empires' && { borderBottomColor: T.yellow, borderBottomWidth: 3 }]}
+                  testID="tab-empires"
+                >
+                  <MaterialCommunityIcons name="web" size={18} color={activeTab === 'empires' ? T.yellow : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'empires' && { color: T.yellow }]}>DISTRIBUTION</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('financials')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'financials' && { borderBottomColor: T.green, borderBottomWidth: 3 }]}
+                  testID="tab-financials"
+                >
+                  <MaterialCommunityIcons name="currency-usd" size={18} color={activeTab === 'financials' ? T.green : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'financials' && { color: T.green }]}>FINANCIALS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('marketing')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'marketing' && { borderBottomColor: T.orange, borderBottomWidth: 3 }]}
+                  testID="tab-marketing"
+                >
+                  <MaterialCommunityIcons name="bullhorn" size={18} color={activeTab === 'marketing' ? T.orange : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'marketing' && { color: T.orange }]}>MARKETING</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('demographics')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'demographics' && { borderBottomColor: T.magenta, borderBottomWidth: 3 }]}
+                  testID="tab-demographics"
+                >
+                  <MaterialCommunityIcons name="account-group" size={18} color={activeTab === 'demographics' ? T.magenta : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'demographics' && { color: T.magenta }]}>DEMOGRAPHICS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setActiveTab('reports')} 
+                  style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 12, gap: 6 }, activeTab === 'reports' && { borderBottomColor: T.cyan, borderBottomWidth: 3 }]}
+                  testID="tab-reports"
+                >
+                  <MaterialCommunityIcons name="compass-outline" size={18} color={activeTab === 'reports' ? T.cyan : T.textMute} />
+                  <Text style={[s.tabButtonText, activeTab === 'reports' && { color: T.cyan }]}>MARKET INTEL</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
 
             {/* V43 — Manager proposals quick banner */}
@@ -535,7 +573,7 @@ export default function Dashboard() {
                     "Construct specialized developer HQs, R&D custom game engines, design next-gen console hardware, and aggregate subscription Game Pass catalog bundles",
                     "gamepad-variant-outline",
                     T.cyan,
-                    () => { setActiveDivision('gaming'); },
+                    () => { router.push('/gaming' as any); },
                     `${playerStudios.length} Operating`
                   )}
                 </>
@@ -593,6 +631,276 @@ export default function Dashboard() {
                   )}
                 </>
               )}
+
+              {activeTab === 'financials' && (() => {
+                const history = state.weekHistory || [];
+                const window = history.slice(-finRange);
+                
+                // Aggregate totals for the window
+                const totals = {
+                  revenue: 0, costs: 0,
+                  cinemaBO: 0, ownedCinema: 0,
+                  streamSubs: 0, streamAds: 0, tvSubs: 0, tvAds: 0,
+                  cableIn: 0, playerCable: 0, packs: 0,
+                  licIn: 0, ipIn: 0, crossIn: 0,
+                  gameSales: 0, gamePassSubs: 0, gameEngineLic: 0,
+                  cinemaOpex: 0, serverCost: 0, broadcast: 0, carriageOut: 0,
+                  prod: 0, mkt: 0, licOut: 0, ipOut: 0, crossOut: 0,
+                  hardwareOpex: 0, studioOpex: 0,
+                  moviesRel: 0, seriesRel: 0, awards: 0, noms: 0,
+                };
+                window.forEach(w => {
+                  totals.cinemaBO += w.cinemaBoxOfficeInB; totals.ownedCinema += w.ownedCinemaRevB;
+                  totals.streamSubs += w.streamingSubsInB; totals.streamAds += w.streamingAdsInB;
+                  totals.tvSubs += w.tvNetworkSubsInB; totals.tvAds += w.tvNetworkAdsInB;
+                  totals.cableIn += w.cableCarriageInB; totals.playerCable += w.playerCableSubsInB;
+                  totals.packs += w.channelPacksInB;
+                  totals.licIn += w.licensingInB; totals.ipIn += w.ipRoyaltiesInB; totals.crossIn += w.crossoverInB;
+                  totals.gameSales += (w as any).gameSalesInB || 0;
+                  totals.gamePassSubs += (w as any).gamePassSubsInB || 0;
+                  totals.gameEngineLic += (w as any).gameEngineLicensingInB || 0;
+                  totals.cinemaOpex += w.cinemaOpexB; totals.serverCost += w.streamingServerB;
+                  totals.broadcast += w.tvBroadcastB; totals.carriageOut += w.cableCarriageOutB;
+                  totals.prod += w.productionCostB; totals.mkt += w.marketingCostB;
+                  totals.licOut += w.licensingOutB; totals.ipOut += w.ipRoyaltiesOutB; totals.crossOut += w.crossoverOutB;
+                  totals.hardwareOpex += (w as any).gamingHardwareOpexB || 0;
+                  totals.studioOpex += (w as any).gamingStudioOpexB || 0;
+                  totals.moviesRel += w.moviesReleased; totals.seriesRel += w.seriesReleased;
+                  totals.awards += w.awardsWeek; totals.noms += w.nominationsWeek;
+                });
+                totals.revenue = totals.cinemaBO + totals.ownedCinema + totals.streamSubs + totals.streamAds + totals.tvSubs + totals.tvAds
+                  + totals.cableIn + totals.playerCable + totals.packs + totals.licIn + totals.ipIn + totals.crossIn
+                  + totals.gameSales + totals.gamePassSubs + totals.gameEngineLic;
+                totals.costs = totals.cinemaOpex + totals.serverCost + totals.broadcast + totals.carriageOut + totals.prod + totals.mkt
+                  + totals.licOut + totals.ipOut + totals.crossOut + totals.hardwareOpex + totals.studioOpex;
+
+                const net = totals.revenue - totals.costs;
+
+                return (
+                  <View style={{ gap: 10, paddingBottom: 20 }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1, marginBottom: 4 }}>LEDGER RANGE FILTER</Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                      {([4, 12, 24, 48, 200] as const).map(r => (
+                        <TouchableOpacity
+                          key={r}
+                          style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#1A1D24', borderWidth: 1, borderColor: T.border }, finRange === r && { backgroundColor: T.green, borderColor: T.green }]}
+                          onPress={() => setFinRange(r)}
+                        >
+                          <Text style={{ color: finRange === r ? '#000' : '#fff', fontWeight: 'bold', fontSize: 11 }}>{r === 200 ? 'All History' : `${r} Weeks`}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <View style={{ borderWidth: 1.5, borderRadius: 10, padding: 14, borderColor: net >= 0 ? T.green : T.red, backgroundColor: '#0C0E12', alignItems: 'center' }}>
+                      <Text style={{ color: T.textMute, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>NET FINANCIAL OPERATING LEDGER</Text>
+                      <Text style={{ fontSize: 26, fontWeight: '900', color: net >= 0 ? T.green : T.red, marginTop: 4 }}>
+                        {net >= 0 ? '+' : '-'}{fmtB(Math.abs(net))}
+                      </Text>
+                      <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-around', marginTop: 10, borderTopWidth: 1, borderTopColor: '#20242E', paddingTop: 10 }}>
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ color: T.green, fontSize: 10, fontWeight: 'bold' }}>REVENUE FLOW</Text>
+                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>{fmtB(totals.revenue)}</Text>
+                        </View>
+                        <View style={{ alignItems: 'center' }}>
+                          <Text style={{ color: T.red, fontSize: 10, fontWeight: 'bold' }}>EXPENSE DEFLATOR</Text>
+                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>{fmtB(totals.costs)}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1, marginTop: 10 }}>LEDGER STATEMENT ENTRIES</Text>
+                    {window.length === 0 ? (
+                      <Text style={{ color: T.textMute, fontStyle: 'italic', textAlign: 'center' }}>No weekly cash statements generated yet.</Text>
+                    ) : (
+                      window.slice().reverse().map((w, index) => {
+                        const id = `${w.year}-${w.week}`;
+                        const wRev = w.cinemaBoxOfficeInB + w.ownedCinemaRevB + w.streamingSubsInB + w.streamingAdsInB
+                          + w.tvNetworkSubsInB + w.tvNetworkAdsInB + w.cableCarriageInB + w.playerCableSubsInB
+                          + w.channelPacksInB + w.licensingInB + w.ipRoyaltiesInB + w.crossoverInB + w.miscInB
+                          + ((w as any).gameSalesInB || 0) + ((w as any).gamePassSubsInB || 0) + ((w as any).gameEngineLicensingInB || 0);
+                        const wCost = w.cinemaOpexB + w.streamingServerB + w.tvBroadcastB + w.cableCarriageOutB
+                          + w.productionCostB + w.marketingCostB + w.licensingOutB + w.ipRoyaltiesOutB + w.crossoverOutB + w.miscOutB
+                          + ((w as any).gamingHardwareOpexB || 0) + ((w as any).gamingStudioOpexB || 0);
+                        const wNet = wRev - wCost;
+                        const exp = finExpandedWeek === id;
+                        return (
+                          <TouchableOpacity
+                            key={id}
+                            style={{ backgroundColor: '#1A1D24', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: T.border, gap: 4 }}
+                            onPress={() => setFinExpandedWeek(exp ? null : id)}
+                          >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <View>
+                                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>Year {w.year} · Week {w.week}</Text>
+                                <Text style={{ color: T.textMute, fontSize: 10 }}>Cash balance: {fmtB(w.cashEndB)}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                  <Text style={{ color: wNet >= 0 ? T.green : T.red, fontSize: 13, fontWeight: '900' }}>{wNet >= 0 ? '+' : ''}{fmtB(wNet)}</Text>
+                                  <Text style={{ color: T.textMute, fontSize: 9 }}>+{fmtB(wRev)} / -{fmtB(wCost)}</Text>
+                                </View>
+                                <MaterialCommunityIcons name={exp ? 'chevron-up' : 'chevron-down'} size={18} color={T.textMute} />
+                              </View>
+                            </View>
+
+                            {exp && (
+                              <View style={{ borderTopWidth: 1, borderTopColor: '#2A303F', marginTop: 8, paddingTop: 8, gap: 5 }}>
+                                {w.cinemaBoxOfficeInB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Cinema Ticket Shares</Text><Text style={{ color: T.cyan, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.cinemaBoxOfficeInB)}</Text></View>}
+                                {w.ownedCinemaRevB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Owned Cinema Profit</Text><Text style={{ color: T.cyan, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.ownedCinemaRevB)}</Text></View>}
+                                {w.streamingSubsInB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Streaming Subscriptions</Text><Text style={{ color: T.magenta, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.streamingSubsInB)}</Text></View>}
+                                {w.streamingAdsInB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Streaming Ads Flow</Text><Text style={{ color: T.magenta, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.streamingAdsInB)}</Text></View>}
+                                {w.tvNetworkSubsInB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· TV Carriage Fees</Text><Text style={{ color: T.yellow, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.tvNetworkSubsInB)}</Text></View>}
+                                {w.tvNetworkAdsInB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· TV Commercial Ads</Text><Text style={{ color: T.yellow, fontSize: 11, fontWeight: 'bold' }}>+{fmtB(w.tvNetworkAdsInB)}</Text></View>}
+                                {((w as any).gameSalesInB || 0) > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Gaming Sales</Text><Text style={{ color: T.cyan, fontSize: 11, fontWeight: 'bold' }}>+{fmtB((w as any).gameSalesInB)}</Text></View>}
+                                {((w as any).gamePassSubsInB || 0) > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Game Pass Subs</Text><Text style={{ color: T.cyan, fontSize: 11, fontWeight: 'bold' }}>+{fmtB((w as any).gamePassSubsInB)}</Text></View>}
+                                {w.productionCostB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Production Outflow</Text><Text style={{ color: T.red, fontSize: 11, fontWeight: 'bold' }}>-{fmtB(w.productionCostB)}</Text></View>}
+                                {w.marketingCostB > 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text style={{ color: T.textMute, fontSize: 11 }}>· Marketing Publicity</Text><Text style={{ color: T.red, fontSize: 11, fontWeight: 'bold' }}>-{fmtB(w.marketingCostB)}</Text></View>}
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                );
+              })()}
+
+              {activeTab === 'marketing' && (() => {
+                const myMovies = state.movies.filter(m => m.studioId === state.player.id && m.status === 'production');
+                const mySeries = (state.tvSeries || []).filter(s => s.studioId === state.player.id && s.status === 'in_production');
+                
+                const totalAlloc = (m: any): number => (Object.values(m.marketingAllocation || {}) as number[]).reduce((a: number, b: number) => a + (b || 0), 0);
+                const bulkAuto = myMovies.length > 0 && myMovies.every((m: any) => m.marketingAuto);
+
+                return (
+                  <View style={{ gap: 10, paddingBottom: 20 }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1, marginBottom: 4 }}>PRODUCTION MARKETING</Text>
+                    
+                    {/* Bulk Actions config */}
+                    <View style={{ backgroundColor: '#141720', borderStyle: 'dashed', borderWidth: 1.5, borderColor: T.yellow, borderRadius: 8, padding: 12, alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ color: T.yellow, fontSize: 11, fontWeight: '900', letterSpacing: 1 }}>BOT BULK MARKETING CONTROLLER</Text>
+                      <Text style={{ color: T.textMute, fontSize: 10, textAlign: 'center', marginTop: 4 }}>Automatically scales marketing allocations for upcoming productions near completion.</Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: bulkAuto ? T.green : '#202430', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, marginTop: 8 }}
+                        onPress={() => setMarketingAutoBulk(!bulkAuto)}
+                      >
+                        <Text style={{ color: bulkAuto ? '#000' : '#fff', fontWeight: 'bold', fontSize: 11 }}>
+                          {bulkAuto ? '🤖 AUTO ACTIVE' : '⏸ AUTO OFF'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', backgroundColor: '#0C0E12', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: T.border, marginBottom: 4 }}>
+                      <TouchableOpacity
+                        style={[{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 }, mktTab === 'movies' && { backgroundColor: T.cyan }]}
+                        onPress={() => setMktTab('movies')}
+                      >
+                        <Text style={{ color: mktTab === 'movies' ? '#000' : T.textMute, fontSize: 11, fontWeight: 'bold' }}>MOVIES ({myMovies.length})</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 }, mktTab === 'series' && { backgroundColor: T.cyan }]}
+                        onPress={() => setMktTab('series')}
+                      >
+                        <Text style={{ color: mktTab === 'series' ? '#000' : T.textMute, fontSize: 11, fontWeight: 'bold' }}>SERIES ({mySeries.length})</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {mktTab === 'movies' ? (
+                      <View style={{ gap: 8 }}>
+                        {myMovies.map((m: any) => {
+                          const rxYr = m.targetReleaseYear || 0;
+                          const rxWk = m.targetReleaseWeek || 0;
+                          const wkLeft = rxYr * 52 + rxWk - (state.year * 52 + state.week);
+                          const allocTotal = totalAlloc(m);
+                          const pct = m.marketingBudget > 0 ? Math.min(100, Math.round((allocTotal / m.marketingBudget) * 100)) : 0;
+                          return (
+                            <TouchableOpacity
+                              key={m.id}
+                              style={{ backgroundColor: '#1A1D24', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: T.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                              onPress={() => router.push(`/marketing/${m.id}` as any)}
+                            >
+                              <View style={{ flex: 1, paddingRight: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{m.title}</Text>
+                                  {m.marketingAuto && <Text style={{ color: T.green, fontSize: 8, fontWeight: 'bold', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, backgroundColor: 'rgba(0,255,100,0.1)' }}>🤖 AUTO</Text>}
+                                </View>
+                                <Text style={{ color: T.textMute, fontSize: 10, marginTop: 2 }}>
+                                  {m.onHold ? '⏸ On Hold' : `Target Y${rxYr} Wk ${rxWk} · in ${wkLeft} weeks`}
+                                </Text>
+                                <Text style={{ color: T.green, fontSize: 10, fontWeight: 'bold', marginTop: 4 }}>
+                                  Allocated: ${allocTotal.toFixed(1)}M / Budget ${m.marketingBudget.toFixed(1)}M
+                                </Text>
+                              </View>
+                              <View style={{ backgroundColor: T.cyan + '15', padding: 8, borderRadius: 6, alignItems: 'center' }}>
+                                <Text style={{ color: T.cyan, fontSize: 10, fontWeight: '900' }}>{pct}%</Text>
+                                <Text style={{ color: T.cyan, fontSize: 8 }}>PREP</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                        {myMovies.length === 0 && <Text style={{ color: T.textMute, fontStyle: 'italic', textAlign: 'center', padding: 15 }}>No movie projects in active production.</Text>}
+                      </View>
+                    ) : (
+                      <View style={{ gap: 8 }}>
+                        {mySeries.map((sre: any) => {
+                          const currentBudget = sre.marketingBudgetM || 0;
+                          return (
+                            <View key={sre.id} style={{ backgroundColor: '#1A1D24', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: T.border }}>
+                              <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{sre.title}</Text>
+                              <Text style={{ color: T.textMute, fontSize: 10, marginTop: 2 }}>
+                                Season {sre.productionSeason || 1} · {sre.productionWeeksLeft ? `${sre.productionWeeksLeft} weeks left to air` : 'Aired'}
+                              </Text>
+                              
+                              <Text style={{ color: T.yellow, fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 8, marginBottom: 4 }}>WEEKLY PUBLICITY BUDGET</Text>
+                              <View style={{ flexDirection: 'row', gap: 5 }}>
+                                {[0, 2, 5, 10, 20].map(b => (
+                                  <TouchableOpacity
+                                    key={b}
+                                    style={[{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 4, backgroundColor: '#20242F', borderWidth: 1, borderColor: 'transparent' }, currentBudget === b && { backgroundColor: T.green, borderColor: T.green }]}
+                                    onPress={() => setEntityMarketing('series', sre.id, b)}
+                                  >
+                                    <Text style={{ color: currentBudget === b ? '#000' : '#fff', fontSize: 10, fontWeight: 'bold' }}>{b === 0 ? 'OFF' : `$${b}M`}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+                          );
+                        })}
+                        {mySeries.length === 0 && <Text style={{ color: T.textMute, fontStyle: 'italic', textAlign: 'center', padding: 15 }}>No TV series in active production.</Text>}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
+              {activeTab === 'demographics' && (() => {
+                const currentAudience = state.audience || [];
+                return (
+                  <View style={{ gap: 10, paddingBottom: 20 }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 1, marginBottom: 4 }}>AUDIENCE DEMOGRAPHICS & GENDER INFO</Text>
+
+                    {currentAudience.map(seg => (
+                      <View key={seg.label} style={{ backgroundColor: '#1A1D24', padding: 12, borderRadius: 8, borderWidth: 1, borderLeftWidth: 5, borderLeftColor: COLOR_HEX[seg.preferredColor] || T.cyan, borderColor: T.border, marginBottom: 2 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>{seg.label}</Text>
+                          <Text style={{ color: T.green, fontSize: 13, fontWeight: 'bold' }}>{(seg.share * 100).toFixed(0)}% MARKET SHARE</Text>
+                        </View>
+                        <Text style={{ color: T.textMute, fontSize: 10, marginTop: 4 }}>
+                          GENRE AFFINITY: <Text style={{ color: '#fff', fontWeight: 'bold' }}>{seg.preferredGenres.join(' · ')}</Text>
+                        </Text>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: '#0F1319', borderWidth: 1.5, borderColor: T.cyan, borderRadius: 8, gap: 6, marginTop: 10 }}
+                      onPress={() => router.push('/trends')}
+                    >
+                      <MaterialCommunityIcons name="chart-bell-curve-cumulative" size={18} color={T.cyan} />
+                      <Text style={{ color: T.cyan, fontSize: 11, fontWeight: '900' }}>VIEW FULL BOX OFFICE GENRE REVENUE</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
             </View>
           </>
         )}

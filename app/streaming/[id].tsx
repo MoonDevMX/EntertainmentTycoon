@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Platform, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Platform, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { TopBar, NeonStat, SectionHeader } from '../../src/ui/components';
 import { TIER_PERIOD_LABEL, effectiveMonthlyPrice, WEEKS_PER_YEAR as WEEKS_PER_YEAR_LOCAL } from '../../src/game/data';
 import { computeLicenseFee } from '../../src/game/sim';
 import { SubscriptionTier, TierPeriod } from '../../src/game/types';
+import { uiAlert } from '../../src/ui/ui-alert';
 
 const PERIOD_OPTS: { key: TierPeriod; label: string }[] = [
   { key: 'monthly', label: 'Mo' },
@@ -18,8 +19,7 @@ const PERIOD_OPTS: { key: TierPeriod; label: string }[] = [
 ];
 
 function notify(title: string, msg: string) {
-  if (Platform.OS === 'web') window.alert(`${title}\n\n${msg}`);
-  else Alert.alert(title, msg);
+  uiAlert(title, msg);
 }
 function fmtSubs(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -170,14 +170,14 @@ export default function StreamingDetail() {
       if (r.error) notify('Cannot delete', r.error);
       else router.replace('/streaming');
     };
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Delete "${svc.name}"? This cannot be undone. All ${svc.subscribers.toLocaleString()} subscribers will be lost.`)) confirmDelete();
-    } else {
-      Alert.alert('Delete service?', `"${svc.name}" will be removed permanently. ${svc.subscribers.toLocaleString()} subscribers will be lost.`, [
+    uiAlert(
+      'Delete service?',
+      `"${svc.name}" will be removed permanently. All ${svc.subscribers.toLocaleString()} subscribers will be lost.`,
+      [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: confirmDelete },
-      ]);
-    }
+      ]
+    );
   };
 
   const updateDraft = (idx: number, patch: Partial<SubscriptionTier>) => {

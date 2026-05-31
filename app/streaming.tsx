@@ -91,6 +91,25 @@ export default function StreamingHub() {
               </TouchableOpacity>
             )}
           </View>
+        ) : state.year < 1997 ? (
+          <View style={[s.launchPanel, { borderColor: T.red }]}>
+            <View style={[s.logo, { backgroundColor: T.red + '20', marginBottom: 12 }]}>
+              <MaterialCommunityIcons name="lock" size={36} color={T.red} />
+            </View>
+            <Text style={[s.launchTitle, { color: T.red }]}>Streaming tech locked in {state.year}</Text>
+            <Text style={s.launchBody}>
+              Streaming technologies have not been invented yet. The digital high-speed internet era begins in <Text style={{ color: T.cyan, fontWeight: '700' }}>Year 1997</Text>.
+            </Text>
+            <View style={[s.bullets, { marginTop: 12, borderTopWidth: 1, borderColor: T.border, paddingTop: 12 }]}>
+              <View style={[s.bullet, { marginBottom: 6 }]}><MaterialCommunityIcons name="radio-tower" size={16} color={T.cyan} /><Text style={s.bulletTxt}>Build regional TV Networks & channels</Text></View>
+              <View style={[s.bullet, { marginBottom: 6 }]}><MaterialCommunityIcons name="home-city" size={16} color={T.yellow} /><Text style={s.bulletTxt}>Construct owned Cinemas across multiple continents</Text></View>
+              <View style={s.bullet}><MaterialCommunityIcons name="disc" size={16} color={T.magenta} /><Text style={s.bulletTxt}>Establish physical Home Media Video Clubs under "Distribution"</Text></View>
+            </View>
+            <View style={[s.cta, { backgroundColor: '#444', borderColor: '#555', opacity: 0.6 }]} testID="launch-service-btn-disabled">
+              <MaterialCommunityIcons name="clock-outline" size={20} color="#888" />
+              <Text style={[s.ctaTxt, { color: '#888' }]}>Streaming Wars Unlocks in 1997</Text>
+            </View>
+          </View>
         ) : (
           <View style={s.launchPanel}>
             <View style={[s.logo, { backgroundColor: state.player.logoBg, marginBottom: 12 }]}>

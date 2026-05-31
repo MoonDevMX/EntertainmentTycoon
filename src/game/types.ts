@@ -236,7 +236,47 @@ export interface Studio {
   awards: number;
   rating: number;
   isPlayer: boolean;
-  unlockedGameGen?: number; // Progressive Unlock level for Gaming Division (1..6)
+  unlockedGameGen?: number; // Progressive Unlock level for Gaming Division (1..8)
+  researchingGameGen?: number; // Target generation being researched (2..8)
+  researchRemainingWeeks?: number; // Weeks remaining until research is complete
+}
+
+export interface VideoStore {
+  id: string;
+  name: string;
+  ownerStudioId?: string; // Studio ID owning this store (player ID if blank/undefined)
+  size: 'kiosk' | 'boutique' | 'megastore';
+  region: 'US' | 'Europe' | 'Asia' | 'LatAm';
+  establishedYear: number;
+  establishedWeek: number;
+  status: 'active' | 'closed';
+  pricingTier: 'budget' | 'balanced' | 'premium';
+  customerBaseM: number;
+  weeklyOpexB: number;
+  weeklyRevenueB: number;
+  rentCostUSD: number; // e.g. $2.99
+  buyCostUSD: number;  // e.g. $14.99
+  vhsStockIds: string[]; // movie IDs stocked as VHS
+  dvdStockIds: string[]; // movie IDs stocked as DVD
+  exclusiveGatedTierIds?: string[]; // gatekeep movies to custom tiers (or general public if empty)
+}
+
+export interface VideoClubDeal {
+  id: string;
+  dealType: 'inbound_vhs' | 'outbound_vhs' | 'inbound_dvd' | 'outbound_dvd' | 'franchise_vhs_license';
+  proposerId: string; // studio/publisher ID
+  receiverId: string; // studio/publisher ID
+  movieId?: string;
+  franchiseId?: string;
+  upfrontFeeB: number;
+  royaltyPercent: number;
+  years: number;
+  signedWeek: number;
+  signedYear: number;
+  expiresWeek: number;
+  expiresYear: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  termsText: string;
 }
 
 export interface AudienceSegment {
@@ -325,6 +365,10 @@ export interface GameState {
   gamingConsoles?: GamingConsole[];
   gamingPasses?: GamingPass[];
   gamingTrends?: GamingTrends;
+  gamingPublishers?: GamingPublisher[];
+  gamingPublishingDeals?: GamingPublishingDeal[];
+  videoStores?: VideoStore[];
+  videoClubDeals?: VideoClubDeal[];
 }
 
 // V43 — Weekly ledger: every tick function adds inflows/outflows by category.
@@ -348,6 +392,7 @@ export interface WeeklyLedger {
   gameSalesInB?: number;              // game raw sales revenue
   gamePassSubsInB?: number;           // Game Pass streaming subscriptions revenue
   gameEngineLicensingInB?: number;    // outbound game engine licensing royalties
+  vstoreRevB?: number;                // retail/home video stores revenue
   miscInB: number;
   // Outflows ($B)
   cinemaOpexB: number;                // owned-cinema opex (operations + amenities)
@@ -361,6 +406,7 @@ export interface WeeklyLedger {
   crossoverOutB: number;              // license fees paid to rival franchise owners for our crossovers
   gamingHardwareOpexB?: number;       // Console R&D and manufacturing cost
   gamingStudioOpexB?: number;         // Gaming HQs base opex & bulk hiring payroll
+  vstoreOpexB?: number;               // retail/home video stores operations opex
   miscOutB: number;
   // Stats
   moviesReleased: number;
@@ -397,6 +443,7 @@ export interface PendingRecap {
     ipRoyaltiesOutB: number;
     crossoverOutB: number;
     miscOutB: number;
+    vstoreOpexB: number;
   };
   moviesReleased: number;
   seriesReleased: number;
@@ -983,6 +1030,9 @@ export interface GamingStudioHQ {
     releaseCadence?: 'rapid' | 'normal' | 'polished';
   };
   upgradesFinishedWeeks?: Record<string, { finishWeek: number; finishYear: number }>; // room_key -> finish date
+  welfareLevel?: 'basic' | 'standard' | 'luxurious';
+  crunchPolicy?: 'none' | 'balanced' | 'crunch';
+  amenities?: Record<string, boolean>; // e.g. freeSnacks, ergoChairs, gym
 }
 
 export type GamingProjectPhase = 'Concept' | 'Pre-Production' | 'Production' | 'Alpha' | 'Beta' | 'Gold' | 'LiveOps';
@@ -1024,6 +1074,7 @@ export interface GamingProject {
   isCloudOnly?: boolean;
   liveopsActive?: boolean;
   dlcsCount?: number;
+  onHold?: boolean;
 }
 
 export interface GamingConsole {
@@ -1052,20 +1103,65 @@ export interface GamingConsole {
   timedExclusivesSignedMovieIds?: string[];
 }
 
+export interface GamingPassTier {
+  id: string;
+  name: string;      // e.g. "Basic Gaming", "Ultimate Pro", etc.
+  price: number;     // $/mo
+  subscriberCount: number; // Millions of active subscribers
+  adSupported: boolean;
+  perks: string[];   // e.g. ["Retro Vault", "Day One VIP", "Cloud Stream", "No Ads"]
+  churnRate: number;
+  monthlyRevenueB: number;
+}
+
 export interface GamingPass {
   id: string;
   studioId: string;
   name: string;
-  basicPrice: number; // $/mo
+  basicPrice: number; // For legacy support
   standardPrice: number;
   premiumPrice: number;
-  subscriberCount: number; // millions
-  catalogProjectIds: string[]; // only games published by studio
-  thirdPartyCatalogIds: string[]; // games licensed from other studios
+  subscriberCount: number; // Aggregate total
+  catalogProjectIds: string[]; // games published under this pass
+  thirdPartyCatalogIds: string[]; // licensed-in game catalog
   monthlyRevenueB: number;
   churnRate?: number;
   adSupported?: boolean;
   enabledConsoleIds?: string[];
+  pricingLevel?: 'value' | 'balanced' | 'premium';
+  libraryScope?: 'indie_only' | 'mixed_catalog' | 'day_one_aaa';
+  adWavelength?: 'none' | 'lite_sponsored' | 'ad_heavy';
+  tiers?: GamingPassTier[];
+  bundleWithStreamingServiceId?: string; // Id of streaming service
+  bundleDiscountPercent?: number; // Coupon percentage off
+}
+
+export interface GamingPublisher {
+  id: string;
+  name: string;
+  logoBg: string;
+  cashB: number;
+  marketShare: number;
+  isSelfPublishingStudioId?: string; // If this publisher is tied back to a studio
+  focusGenre: string[];
+  reputation: number; // 0..100
+  isPlayerOwned?: boolean;
+}
+
+export interface GamingPublishingDeal {
+  id: string;
+  dealType: 'publishing_inbound' | 'publishing_outbound' | 'crossover_license' | 'franchise_trade' | 'gamepass_bulk_catalog';
+  proposerStudioId: string;
+  receiverStudioId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'countered';
+  franchiseId?: string;
+  gameId?: string;
+  years?: number;
+  upfrontFeeB: number;
+  royaltyPercent?: number;
+  exclusiveConsoleId?: string;
+  termsText: string;
+  counterFeeB?: number;
 }
 
 export interface GamingTrends {
